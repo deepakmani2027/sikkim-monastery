@@ -169,7 +169,7 @@ export function ScholarSearch() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button onClick={runSearch} disabled={loading || !q.trim()} className="min-w-28">
               {loading ? (<span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Searching</span>) : "Search"}
             </Button>
@@ -182,7 +182,12 @@ export function ScholarSearch() {
         {/* Quick presets */}
         <div className="flex flex-wrap gap-2">
           {presets.map((p) => (
-            <Badge key={p} variant="outline" className="cursor-pointer hover:bg-muted" onClick={() => setQ(p)}>
+            <Badge
+              key={p}
+              variant="outline"
+              className="cursor-pointer hover:bg-muted max-w-full whitespace-normal break-words text-left leading-tight"
+              onClick={() => setQ(p)}
+            >
               {p}
             </Badge>
           ))}
@@ -235,10 +240,12 @@ export function ScholarSearch() {
 
         {/* Active filters */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {asYlo && <Badge variant="outline">From {asYlo}</Badge>}
-          {asYhi && <Badge variant="outline">To {asYhi}</Badge>}
-          {scisbd !== "0" && <Badge variant="outline">Sort: {scisbd === "1" ? "Recent (abstracts)" : "Recent (all)"}</Badge>}
-          {lastQuery && <Badge variant="secondary">Query: {lastQuery}</Badge>}
+          {asYlo && <Badge variant="outline" className="max-w-full whitespace-normal break-words">From {asYlo}</Badge>}
+          {asYhi && <Badge variant="outline" className="max-w-full whitespace-normal break-words">To {asYhi}</Badge>}
+          {scisbd !== "0" && (
+            <Badge variant="outline" className="max-w-full whitespace-normal break-words">{`Sort: ${scisbd === "1" ? "Recent (abstracts)" : "Recent (all)"}`}</Badge>
+          )}
+          {lastQuery && <Badge variant="secondary" className="max-w-full whitespace-normal break-words">Query: {lastQuery}</Badge>}
         </div>
 
         {error && (
@@ -258,11 +265,14 @@ export function ScholarSearch() {
             </div>
           )}
           {results.map((r, idx) => (
-            <div key={idx} className="p-4 border rounded-xl bg-card hover:bg-muted/40 transition-colors relative overflow-hidden">
-              <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400 via-amber-500 to-amber-600" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <a href={r.link} target="_blank" className="text-base font-semibold hover:underline">
+            <div
+              key={idx}
+              className="relative overflow-hidden rounded-xl border border-border/70 bg-gradient-to-r from-background/80 to-transparent shadow-[0_1px_0_rgba(0,0,0,0.03)] hover:shadow-md transition-all hover:-translate-y-0.5"
+            >
+              <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
+              <div className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <a href={r.link} target="_blank" className="text-base font-semibold hover:underline break-words">
                     {highlight(r.title || "Untitled")}
                   </a>
                   <div className="text-xs text-muted-foreground mt-1">
@@ -271,23 +281,36 @@ export function ScholarSearch() {
                     {hostOf(r.link) && <> • {hostOf(r.link)}</>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 whitespace-nowrap">
+                <div className="flex items-center gap-2 flex-wrap sm:whitespace-nowrap">
                   {typeof r.cited_by === "number" && (
-                    <a href={r.cited_by_link || undefined} target="_blank" className="text-xs inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 ring-1 ring-amber-200">
+                    <a
+                      href={r.cited_by_link || undefined}
+                      target="_blank"
+                      className="text-xs inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 ring-1 ring-amber-200"
+                    >
                       Cited by {r.cited_by}
                     </a>
                   )}
                   {r.pdf && (
-                    <a href={r.pdf} target="_blank" className="text-xs inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 px-2 py-0.5 ring-1 ring-emerald-200">
+                    <a
+                      href={r.pdf}
+                      target="_blank"
+                      className="text-xs inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 px-2 py-0.5 ring-1 ring-emerald-200"
+                    >
                       <FileText className="h-3 w-3" /> PDF
                     </a>
                   )}
-                  <button onClick={() => copyCitation(r)} className="text-xs inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 hover:bg-muted/80">
+                  <button
+                    onClick={() => copyCitation(r)}
+                    className="text-xs inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 hover:bg-muted/80"
+                  >
                     <Copy className="h-3 w-3" /> Cite
                   </button>
                 </div>
               </div>
-              {r.snippet && <div className="text-sm text-muted-foreground mt-2">{highlight(r.snippet)}</div>}
+              {r.snippet && (
+                <div className="text-sm text-muted-foreground px-4 pb-4 -mt-1">{highlight(r.snippet)}</div>
+              )}
             </div>
           ))}
         </div>

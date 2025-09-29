@@ -79,9 +79,9 @@ export const monasteries: Monastery[] = [
     description: "The largest monastery in Sikkim and the main seat of the Karma Kagyu lineage outside Tibet.",
     history:
       "Built in the 1960s by the 16th Karmapa, Rangjung Rigpe Dorje, as the main seat of the Karma Kagyu lineage in exile.",
-    significance: "Serves as the main monastery of one of the four major schools of Tibetan Buddhism.",
-    founded: "1966",
-    architecture: "Traditional Tibetan architecture with golden roof and intricate woodwork",
+  significance: `Rumtek is the most important monastery of the Karma Kagyu sect in exile and serves as the main seat of the Karmapa in India. It is often referred to as the "Dharma Chakra Centre" and is a hub of spiritual learning and practice. Pilgrims and tourists visit it not only for its religious importance but also for its breathtaking views of Gangtok and the lush hills around it.`,
+  founded: `1966 by the 16th Karmapa, Rangjung Rigpe Dorje, though its original foundation traces back to the 12th century in Tibet.`,
+  architecture: `The monastery reflects traditional Tibetan Buddhist architecture with a golden roof, intricately carved woodwork, and ornate murals. The main shrine hall is richly decorated with thangkas, silk paintings, and statues. Surrounding the monastery are monk quarters, a monastic college, and a golden stupa containing the relics of the 16th Karmapa.`,
     images: [
       "/rumtek-monastery-sikkim-buddhist-temple.jpg",
       "/rumtek-monastery-interior-golden-buddha.jpg",
@@ -217,10 +217,10 @@ export const monasteries: Monastery[] = [
     district: "West Sikkim",
     coordinates: { lat: 27.2951, lng: 88.2158 },
     description: "One of the oldest and most important monasteries in Sikkim, offering stunning views of Kanchenjunga.",
-    history: "Founded in 1705 by Lama Lhatsun Chempo, it's the head monastery of the Nyingma order in Sikkim.",
-    significance: "Only 'pure monks' (ta-tshang) are allowed to be admitted to this monastery.",
-    founded: "1705",
-    architecture: "Three-story structure with traditional Sikkimese architecture",
+  history: "Founded in 1705 by Lama Lhatsun Chempo and expanded by successive Nyingma masters; it's the head monastery of the Nyingma order in Sikkim.",
+  significance: `Pemayangtse, meaning "Perfect Sublime Lotus," is one of the most sacred monasteries of the Nyingma order. It played a central role in the coronation of Sikkim’s kings (Chogyals). The monastery is also known for the annual Cham (masked) dances, which depict the triumph of good over evil and attract devotees from across the region.`,
+  founded: `1705 by Lama Lhatsun Chempo and later expanded by successive Nyingma masters.`,
+  architecture: `A three-storied monastery featuring traditional Tibetan woodwork, statues, and murals. The top floor houses a remarkable seven-tiered wooden structure called Sangtok Palri, which represents the heavenly abode of Guru Padmasambhava. Its intricate hand-carved details make it one of the finest artistic masterpieces of Sikkimese monastic craftsmanship.`,
     images: [
       "/pemayangtse-monastery-sikkim-mountain-view.jpg",
       "/pemayangtse-monastery-interior-wooden-sculptures.jpg",
@@ -297,11 +297,11 @@ export const monasteries: Monastery[] = [
     location: "Tashiding, West Sikkim",
     district: "West Sikkim",
     coordinates: { lat: 27.3333, lng: 88.2667 },
-    description: "Sacred monastery believed to cleanse sins of those who visit with pure heart and devotion.",
-    history: "Built in 1717 by Ngadak Sempa Chempo, it's considered one of the most sacred monasteries in Sikkim.",
-    significance: "The sacred Bumchu ceremony is held here annually, predicting the year ahead for Sikkim.",
-    founded: "1717",
-    architecture: "Perched on a hilltop with panoramic views of the Himalayas",
+  description: "Sacred monastery believed to cleanse sins of those who visit with pure heart and devotion.",
+  history: "Built in 1717 by Ngadak Sempa Chempo, it's considered one of the most sacred monasteries in Sikkim.",
+  significance: `Tashiding is considered the most holy monastery in Sikkim. It is believed that a visit here purifies sins and brings blessings. The annual Bumchu Festival held here is a major event where lamas open a sacred vessel of holy water to predict the fortunes of the coming year. This makes it not only a religious site but also a place of prophecy and pilgrimage.`,
+  founded: "1717 by Ngadak Sempa Chempo Phunshok Rigzing, a revered lama of the Nyingma tradition.",
+  architecture: `Built on a sacred hilltop between the Rathong and Rangit rivers, the monastery is surrounded by dozens of ancient chortens (stupas) and prayer flags fluttering in the wind. The main shrine features murals, statues of deities, and sacred relics. Its location on the hill gives it a serene and mystical aura.`,
     images: [
       "/tashiding-monastery-sikkim-sacred-site.jpg",
       "/tashiding-monastery-hilltop-view-prayer-flags.jpg",
@@ -372,9 +372,9 @@ export const monasteries: Monastery[] = [
     history:
       "Traditionally believed to be blessed by Lama Drupthob Karpo, Enchey was rebuilt in 1909 under the rule of Sidkeong Tulku Namgyal.",
     significance:
-      "Important center of the Nyingma order with strong cultural presence in Gangtok; famous for its annual Chaam (mask) dances.",
-    founded: "1909",
-    architecture: "Traditional Sikkimese-Tibetan style with vibrant murals and ornate woodwork.",
+      `Enchey is closely linked with the legends of its founder and remains a center for tantric practices. It is especially famous for the vibrant annual Chaam Dance Festival, when monks wear masks and perform ritual dances to drive away evil spirits. The monastery is a spiritual protector of Gangtok and is considered highly auspicious by locals.`,
+    founded: "1909 by Lama Drupthob Karpo, a tantric master known for his ability to fly.",
+  architecture: `The monastery is built in Chinese pagoda style with colorful paintings and murals depicting deities and spiritual stories. Inside are sacred images of Buddha, Lokeshwara, and Guru Padmasambhava. Around the monastery, rows of prayer wheels and fluttering flags create a spiritual atmosphere.`,
     images: [
       "/enchey-2.jpg",
       "/monastery-interior-1.jpg",
@@ -410,9 +410,9 @@ export const monasteries: Monastery[] = [
     history:
       "Established soon after the consecration of the first Chogyal (king) of Sikkim at Yuksom by Lhatsun Namkha Jigme.",
     significance:
-      "Considered the oldest monastery of Sikkim and a key pilgrimage site connected with the founding of the kingdom.",
-    founded: "1701",
-    architecture: "Stone masonry with traditional woodwork, serene forested setting.",
+      `Dubdi, meaning "Retreat," is the oldest monastery in Sikkim and holds immense historical value as the birthplace of Sikkimese Buddhism. It was established after the crowning of the first king and symbolizes the spiritual foundation of Sikkim’s monarchy and Buddhist heritage. Today, it remains a quiet pilgrimage spot for those seeking solitude and history.`,
+    founded: "1701 by Lhatsun Namkha Jigme, one of the three founding lamas of Sikkim, soon after the coronation of the first Chogyal at Yuksom.",
+  architecture: `A small, stone-built monastery located deep in the forests near Yuksom. It features tapering stone walls, a prayer hall with ancient manuscripts, and statues of Buddhist deities. Its simplicity and seclusion embody the true essence of a hermitage.`,
     images: [
       "/monastery-exterior-mountain.jpg",
       "/mountain-with-cliff.jpg",
@@ -447,9 +447,9 @@ export const monasteries: Monastery[] = [
     history:
       "Founded by Lama Lhatsun Chempo in the 17th century; an important Nyingma monastery overlooking Pelling.",
     significance:
-      "Houses ancient clay statues and holds significant religious importance for locals and pilgrims.",
-    founded: "17th century",
-    architecture: "Traditional hilltop monastery accessed by a forested trail.",
+      `Sangachoeling, meaning "Island of Secret Spells," is one of the most sacred monasteries of the Nyingma sect. Its remote location made it a meditation retreat for monks. It also played an important role in spreading Buddhism across Sikkim. The monastery is visited by pilgrims as part of the sacred Buddhist pilgrimage circuit in West Sikkim.`,
+  founded: `1697 by Lama Lhatsun Chempo, making it the second oldest monastery in Sikkim.`,
+  architecture: `Situated on a ridge above Pelling, it is accessible only by a steep walking trail. The monastery follows traditional Tibetan style, housing clay statues of saints, ancient murals, and sacred scriptures. Surrounded by dense forests, it provides an atmosphere of seclusion and deep spirituality.`,
     images: [
       "/monastery-interior-1.jpg",
       "/monastery-exterior-mountain.jpg",

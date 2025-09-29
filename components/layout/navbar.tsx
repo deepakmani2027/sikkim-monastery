@@ -47,7 +47,7 @@ export function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
           <Link href="/dashboard" className="flex items-center space-x-4">
-            <Logo size={56} responsive />
+            <Logo size={56} responsive disableLink />
             <div>
               <h1 className="text-xl font-bold text-card-foreground">DharmaTech</h1>
               <p className="text-xs text-muted-foreground">Connecting Sikkim to the World</p>
@@ -120,17 +120,21 @@ export function Navbar() {
                 <Link href="/admin">Admin Panel</Link>
               </Button>
             )}
-            <Button asChild variant="ghost" size="sm" className="w-full justify-start mb-2">
-              <Link href="/search">Search</Link>
-            </Button>
-            {canSeeArchives && (
+            {user?.role === "tourist" && (
+              <>
+                <Button asChild variant="ghost" size="sm" className="w-full justify-start mb-2">
+                  <Link href="/search">Search</Link>
+                </Button>
+                <Button asChild variant="ghost" size="sm" className="w-full justify-start mb-2">
+                  <Link href="/virtual-tours">Virtual Tours</Link>
+                </Button>
+              </>
+            )}
+            {user?.role === "researcher" && (
               <Button asChild variant="ghost" size="sm" className="w-full justify-start mb-2">
                 <Link href="/digital-archives">Digital Archives</Link>
               </Button>
             )}
-            <Button asChild variant="ghost" size="sm" className="w-full justify-start mb-2">
-              <Link href="/virtual-tours">Virtual Tours</Link>
-            </Button>
             {user && (
               <>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start mb-2">

@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  BookOpen,
 } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { toast } from "sonner"
@@ -399,7 +400,7 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
 
         {/* Detailed Information */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="w-full gap-1 p-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="media">Media</TabsTrigger>
             <TabsTrigger value="visiting">Visiting Info</TabsTrigger>
@@ -408,9 +409,14 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
             <TabsTrigger value="audio">Audio Guide</TabsTrigger>
           </TabsList>
           <TabsContent value="media" className="space-y-6">
-            <Card>
+            <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
               <CardHeader>
-                <CardTitle>Photos & Videos from Google</CardTitle>
+                <CardTitle className="flex items-center gap-3 font-extrabold text-primary tracking-tight">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                    <Camera className="h-4 w-4" />
+                  </span>
+                  Photos & Videos from Google
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <GooglePhotosGrid name={monastery.name} lat={monastery.coordinates.lat} lng={monastery.coordinates.lng} />
@@ -424,56 +430,74 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
+              <Card className="relative overflow-hidden border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Info className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-3 font-extrabold text-primary tracking-tight">
+                    <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                      <Info className="h-4 w-4" />
+                    </span>
                     About This Monastery
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-5 text-[15px] leading-7 tracking-[.01em]">
                   <div>
-                    <h4 className="font-medium text-foreground mb-2">Founded</h4>
-                    <p className="text-muted-foreground">{monastery.founded}</p>
+                    <h4 className="font-semibold text-foreground mb-1.5">Founded</h4>
+                    <p className="text-foreground/90">{monastery.founded}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-foreground mb-2">Architecture</h4>
-                    <p className="text-muted-foreground">{monastery.architecture}</p>
+                    <h4 className="font-semibold text-foreground mb-1.5">Architecture</h4>
+                    <p className="text-foreground/90">{monastery.architecture}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-foreground mb-2">Significance</h4>
-                    <p className="text-muted-foreground">{monastery.significance}</p>
+                    <h4 className="font-semibold text-foreground mb-1.5">Significance</h4>
+                    <p className="text-foreground/90">{monastery.significance}</p>
                   </div>
                 </CardContent>
               </Card>
 
               {monastery.audioGuide?.available && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Headphones className="h-5 w-5" />
+                <Card className="relative overflow-hidden border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
+                  {/* subtle decorative glow using same palette */}
+                  <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-amber-300/20 blur-3xl" />
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-3 font-extrabold tracking-tight">
+                      <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                        <Headphones className="h-4 w-4" />
+                      </span>
                       Audio Guide
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h4 className="font-medium text-foreground mb-2">Duration</h4>
-                      <p className="text-muted-foreground">{monastery.audioGuide.duration}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-foreground mb-2">Available Languages</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {monastery.audioGuide.languages.map((lang) => (
-                          <Badge key={lang} variant="outline">
-                            {lang}
-                          </Badge>
-                        ))}
+                  <CardContent className="space-y-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <h4 className="font-semibold text-foreground mb-1.5">Duration</h4>
+                        <p className="text-foreground/90">{monastery.audioGuide.duration}</p>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-foreground mb-1.5">Available Languages</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {monastery.audioGuide.languages.map((lang) => (
+                            <Badge
+                              key={lang}
+                              variant="outline"
+                              className="border-amber-400/50 bg-transparent hover:bg-amber-200/20"
+                            >
+                              {lang}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <Button className="w-full" onClick={goToAudioGuide}>
-                      <Headphones className="mr-2 h-4 w-4" />
-                      Start Audio Guide
-                    </Button>
+                    <div className="pt-1">
+                      <Button
+                        className="w-full h-11 rounded-full shadow-md ring-1 ring-primary/40 hover:ring-primary/50"
+                        onClick={goToAudioGuide}
+                        aria-label="Start Audio Guide"
+                      >
+                        <Headphones className="mr-2 h-4 w-4" />
+                        Start Audio Guide
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -481,10 +505,12 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
           </TabsContent>
 
           <TabsContent value="visiting" className="space-y-6">
-            <Card>
+            <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-3 font-extrabold text-primary tracking-tight">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                    <Clock className="h-4 w-4" />
+                  </span>
                   Visiting Information
                 </CardTitle>
               </CardHeader>
@@ -514,9 +540,14 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
-            <Card>
+            <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
               <CardHeader>
-                <CardTitle>Historical Background</CardTitle>
+                <CardTitle className="flex items-center gap-3 font-extrabold text-primary tracking-tight">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                    <BookOpen className="h-4 w-4" />
+                  </span>
+                  Historical Background
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground leading-relaxed">{monastery.history}</p>
@@ -527,10 +558,12 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
           <TabsContent value="festivals" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {monastery.festivals.map((festival, index) => (
-                <Card key={index}>
+                <Card key={index} className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-3 font-extrabold text-primary tracking-tight">
+                      <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                        <Calendar className="h-4 w-4" />
+                      </span>
                       {festival.name}
                     </CardTitle>
                   </CardHeader>
@@ -556,7 +589,7 @@ In short, Rumtek Monastery is like a living museum of Buddhist art and sacred he
                 chapters={audioChapters}
               />
             ) : (
-              <Card>
+              <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
                 <CardContent className="p-12 text-center">
                   <Headphones className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">Audio Guide Not Available</h3>

@@ -170,9 +170,17 @@ export default function ExplorePage() {
                           <span className="text-sm font-medium">{monastery.rating}</span>
                         </div>
                       </div>
-                      <div className="flex items-center text-sm text-muted-foreground mb-2">
-                        <MapPin className="mr-1 h-4 w-4" />
-                        {monastery.location} • Founded {monastery.founded}
+                      <div className="text-sm text-muted-foreground mb-2">
+                        <div className="flex items-center mb-1">
+                          <MapPin className="mr-1 h-4 w-4" />
+                          {monastery.location}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center">Founded {monastery.founded}</span>
+                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[12px] font-medium text-primary">
+                            {monastery.reviews} reviews
+                          </span>
+                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-1">{monastery.description}</p>
                       <div className="mt-auto flex items-center justify-between pt-1">

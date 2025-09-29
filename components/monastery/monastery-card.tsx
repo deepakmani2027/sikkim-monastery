@@ -13,7 +13,7 @@ interface MonasteryCardProps {
 
 export function MonasteryCard({ monastery }: MonasteryCardProps) {
   return (
-    <Card className="overflow-hidden transition-all duration-300 group pt-0 rounded-xl">
+    <Card className="overflow-hidden transition-all duration-300 group pt-0 rounded-xl h-full flex flex-col">
       <div className="relative overflow-hidden aspect-[4/3] rounded-t-xl">
         <img
           src={monastery.images[0] || "/placeholder.svg"}
@@ -56,19 +56,17 @@ export function MonasteryCard({ monastery }: MonasteryCardProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 flex flex-col flex-1">
         <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{monastery.description}</p>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Founded {monastery.founded}
-            </span>
-            <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {monastery.reviews} reviews
-            </span>
+        <div className="text-xs text-muted-foreground mb-4 space-y-1">
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Founded {monastery.founded}
+          </div>
+          <div className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            <Users className="h-3 w-3" />
+            {monastery.reviews} reviews
           </div>
         </div>
 
@@ -85,7 +83,7 @@ export function MonasteryCard({ monastery }: MonasteryCardProps) {
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="mt-auto flex gap-2">
           <Button asChild size="sm" className="flex-1">
             <Link href={`/monastery/${monastery.id}`}>Explore</Link>
           </Button>

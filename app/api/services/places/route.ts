@@ -21,7 +21,8 @@ export async function GET(req: Request) {
   const placeId = url.searchParams.get("placeId")
   const text = url.searchParams.get("text")
   const find = url.searchParams.get("find")
-  const key = process.env.GOOGLE_PLACES_API_KEY
+  // Support either a server-side key or the public client key as fallback
+  const key = process.env.GOOGLE_PLACES_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
   // Graceful fallback when API key is not configured: return empty results
   if (!key) {

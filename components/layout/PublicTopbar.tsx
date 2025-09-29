@@ -49,7 +49,7 @@ export function PublicTopbar({ hideVirtualTours }: PublicTopbarProps) {
         <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-  <Logo withText withTagline size={65} responsive />
+  <Logo withText withTagline size={65} responsive disableLink />
 
         <button
           className="md:hidden inline-flex items-center justify-center rounded-md h-10 w-10 text-foreground/70 hover:text-foreground transition-colors"

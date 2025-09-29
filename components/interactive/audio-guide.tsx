@@ -126,23 +126,66 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
     return m[l] || "en"
   }
 
-  async function translateTextMyMemory(text: string, from: string, to: string): Promise<string> {
-    // Split into sentences to stay under URL length limits and improve quality
+  // Helper: split into reasonable chunks (combine sentences up to ~450 chars)
+  function chunkTextBySentences(text: string, maxLen = 450): string[] {
     const sentences = text
       .replace(/\s+/g, " ")
       .split(/(?<=[.!?])\s+/)
       .filter(Boolean)
-    const results: string[] = []
+    const chunks: string[] = []
+    let buf = ""
     for (const s of sentences) {
-      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(s)}&langpair=${from}|${to}`
-      const r = await fetch(url)
-      const j = await r.json()
-      const t = j?.responseData?.translatedText || s
-      results.push(t)
-      // Be polite to the free API
-      await new Promise((res) => setTimeout(res, 120))
+      if ((buf + " " + s).trim().length > maxLen) {
+        if (buf) chunks.push(buf.trim())
+        buf = s
+      } else {
+        buf = (buf + " " + s).trim()
+      }
     }
-    return results.join(" ")
+    if (buf) chunks.push(buf.trim())
+    return chunks
+  }
+
+  // Helper: fetch with timeout support
+  async function fetchWithTimeout(url: string, opts: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
+    const { timeoutMs = 6000, ...rest } = opts
+    const timeout = new Promise<Response>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), timeoutMs)
+    )
+    return Promise.race([fetch(url, rest), timeout]) as Promise<Response>
+  }
+
+  async function translateTextMyMemory(text: string, from: string, to: string): Promise<string> {
+    // Batch into larger chunks and translate with limited parallelism for speed
+    const chunks = chunkTextBySentences(text, 450)
+    if (chunks.length === 0) return text
+
+    const signal = abortRef.current?.signal
+
+    async function translateChunk(s: string) {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(s)}&langpair=${from}|${to}`
+      try {
+        const r = await fetchWithTimeout(url, { signal, cache: "no-store" })
+        const j = await r.json().catch(() => ({} as any))
+        return (j?.responseData?.translatedText as string) || s
+      } catch {
+        // On any error or timeout, fall back to original chunk so we don't block playback
+        return s
+      }
+    }
+
+    // Run up to 3 requests in parallel
+    const concurrency = Math.min(3, chunks.length)
+    const out: string[] = new Array(chunks.length)
+    let i = 0
+    const worker = async () => {
+      while (i < chunks.length) {
+        const idx = i++
+        out[idx] = await translateChunk(chunks[idx])
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, worker))
+    return out.join(" ")
   }
 
   async function getSpokenTextForLanguage(text: string, languageLabel: string, chapterIndex: number): Promise<string> {
@@ -378,6 +421,30 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Prefetch translation for the current chapter on language or chapter change to reduce wait time
+  useEffect(() => {
+    const to = langToCode(selectedLanguage)
+    if (!['hi','ne'].includes(to)) return
+    const baseText = chapters[currentChapter]?.content || chapters[currentChapter]?.description || ''
+    if (!baseText) return
+    const key = `${currentChapter}:${to}`
+    if (translationCache.current[key]) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const translated = await translateTextMyMemory(baseText, 'en', to)
+        if (!cancelled) {
+          translationCache.current[key] = translated
+        }
+      } catch {
+        // ignore prefetch errors
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedLanguage, currentChapter, chapters])
+
   // Seek handling: estimate sentence positions and restart speech from target time
   const estimateSentenceDurations = (sentences: string[], rate: number) => {
     const baseWPM = 160
@@ -478,19 +545,24 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
   return (
     <div className="space-y-6">
       {/* Audio Guide Header */}
-      <Card>
+      <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Headphones className="h-5 w-5" />
-              Audio Guide: {monasteryName}
+          {/* Stack on mobile, align horizontally on larger screens to avoid overlap */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+            <CardTitle className="flex items-center gap-3 font-extrabold text-primary tracking-tight w-full">
+              <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary ring-1 ring-primary/30">
+                <Headphones className="h-4 w-4" />
+              </span>
+              <span className="leading-tight break-words">
+                Audio Guide: {monasteryName}
+              </span>
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="flex items-center gap-1">
+            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+              <Badge variant="outline" className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs">
                 <Clock className="h-3 w-3" />
                 {duration}
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1">
+              <Badge variant="outline" className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs">
                 <Languages className="h-3 w-3" />
                 {languages.length} languages
               </Badge>
@@ -500,7 +572,7 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
       </Card>
 
       {/* Main Player */}
-      <Card>
+      <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
         <CardContent className="p-6">
           {/* Current Chapter Info */}
           <div className="text-center mb-6">
@@ -514,6 +586,7 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
           {/* Seek Bar */}
           <div className="space-y-3 mb-6">
             <Slider
+              className="[&_[data-slot=slider-track]]:bg-amber-300 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-range]]:bg-amber-900 [&_[data-slot=slider-thumb]]:border-amber-900"
               value={[seekingTime ?? currentTime]}
               min={0}
               max={Math.max(1, totalTime)}
@@ -564,7 +637,13 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
               <Button variant="ghost" size="sm" onClick={() => setIsMuted(!isMuted)}>
                 {isMuted || volume[0] === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </Button>
-              <Slider value={isMuted ? [0] : volume} onValueChange={setVolume} max={100} step={1} className="flex-1" />
+              <Slider
+                value={isMuted ? [0] : volume}
+                onValueChange={setVolume}
+                max={100}
+                step={1}
+                className="flex-1 [&_[data-slot=slider-track]]:bg-amber-300 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-range]]:bg-amber-900 [&_[data-slot=slider-thumb]]:border-amber-900"
+              />
             </div>
 
             {/* Language Selection */}
@@ -606,7 +685,7 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
       </Card>
 
       {/* Chapter List */}
-      <Card>
+      <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
         <CardHeader>
           <CardTitle>Chapters</CardTitle>
         </CardHeader>
@@ -615,17 +694,17 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
             {chapters.map((chapter, index) => (
               <div
                 key={chapter.id}
-                className={`w-full p-3 rounded-lg border transition-colors ${
+                className={`w-full p-3 rounded-lg border overflow-hidden transition-colors ${
                   currentChapter === index ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <button
                     onClick={() => setCurrentChapter(index)}
-                    className="flex-1 text-left"
+                    className="flex-1 text-left min-w-0"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium">
+                    <div className="flex items-center gap-2 mb-1 min-w-0">
+                      <span className="text-sm font-medium break-words">
                         {index + 1}. {chapter.title}
                       </span>
                       {currentChapter === index && isPlaying && (
@@ -636,9 +715,9 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{chapter.description}</p>
+                    <p className="text-xs text-muted-foreground break-words">{chapter.description}</p>
                   </button>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Badge variant="outline" className="text-xs">
                       {chapter.duration}
                     </Badge>
@@ -663,7 +742,7 @@ export function AudioGuide({ monasteryName, languages, duration, chapters }: Aud
       </Card>
 
       {/* Download Options */}
-      <Card>
+      <Card className="rounded-2xl border-amber-300/60 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.35)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="h-5 w-5" />
