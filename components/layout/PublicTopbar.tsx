@@ -13,7 +13,7 @@ interface PublicTopbarProps {
 }
 
 export function PublicTopbar({ hideVirtualTours }: PublicTopbarProps) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
   const [progress, setProgress] = useState(0)
   const [open, setOpen] = useState(false)
 
@@ -98,7 +98,7 @@ export function PublicTopbar({ hideVirtualTours }: PublicTopbarProps) {
             <span className="inline-flex items-center gap-1"><Phone className="h-4 w-4" /> Contact</span>
           </Button>
           <ThemeToggle />
-          {!isAuthenticated ? (
+          {(!loading && !isAuthenticated) ? (
             <Button asChild size="sm" className="ml-1 hover:shadow-md transition-transform hover:translate-y-[-1px]">
               <Link href="/auth" className="inline-flex items-center gap-1"><LogIn className="h-4 w-4" /> Sign in</Link>
             </Button>
@@ -123,7 +123,7 @@ export function PublicTopbar({ hideVirtualTours }: PublicTopbarProps) {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            {!isAuthenticated ? (
+            {(!loading && !isAuthenticated) ? (
               <Button asChild className="flex-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-105">
                 <Link href="/auth"><LogIn className="h-4 w-4 mr-1" /> Sign in</Link>
               </Button>
