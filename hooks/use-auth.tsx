@@ -2,6 +2,7 @@
 
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react"
 import { supabase, isSupabaseEnabled } from "@/lib/supabase"
+import { authenticateMockUser } from "@/lib/mockAuth"
 
 type Role = "tourist" | "researcher" | "admin"
 
