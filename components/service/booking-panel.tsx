@@ -33,6 +33,9 @@ export function BookingPanel(){
   const [diningDialogOpen, setDiningDialogOpen] = useState(false)
   const [selectedDining, setSelectedDining] = useState<any|null>(null)
   const [diningReservation, setDiningReservation] = useState<{ date: string; time: string }>({ date: '', time: '' })
+  const [toursDialogOpen, setToursDialogOpen] = useState(false)
+  const [selectedTour, setSelectedTour] = useState<any|null>(null)
+  const [tourReservation, setTourReservation] = useState<{ date: string; time: string }>({ date: '', time: '' })
 
   function buildShortDescription(p: any, monasteryName?: string, amenities: string[] = [], isHotel = true) {
     const stars = Number(p?.tags?.stars)
@@ -854,12 +857,7 @@ export function BookingPanel(){
                               ₹{formatINR(x.priceINR)}<span className="pl-1 text-amber-800 text-sm font-medium">/person</span>
                             </div>
                             <div className="flex items-center gap-2 pt-1">
-                              <Button className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600" onClick={async()=>{
-                                const r = await fetch('/api/services/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type: 'tours', item: x, monasteryId, dates, guests }) })
-                                const j = await r.json();
-                                if (r.ok) toast.success('Request recorded')
-                                else toast.error(j.error||'Failed')
-                              }}>
+                              <Button className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600" onClick={()=>{ setSelectedTour(x); setToursDialogOpen(true) }}>
                                 <ExternalLink className="w-4 h-4 mr-2"/> Book Experience
                               </Button>
                             </div>
@@ -962,8 +960,49 @@ export function BookingPanel(){
                 const payload = { type: 'hotel', item: selectedHotel, monasteryId, dates, nights, options: { cancellation: hotelAddOns.cancellation, addOn }, bill: { perNight, subtotal, gstRate, gstAmt, addOn, total } }
                 const r = await fetch('/api/services/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
                 const j = await r.json()
-                if (r.ok) { toast.success('Booking request submitted'); setHotelDialogOpen(false); setSelectedHotel(null) }
-                else toast.error(j.error||'Failed')
+                if (!r.ok) { toast.error(j.error || 'Failed'); return }
+
+                // If server returned a Razorpay order, open checkout
+                if (j?.order) {
+                  try {
+                    // load script if needed
+                    if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+                      await new Promise<void>((resolve, reject) => {
+                        const s = document.createElement('script')
+                        s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+                        s.onload = () => resolve()
+                        s.onerror = () => reject(new Error('Failed to load Razorpay SDK'))
+                        document.head.appendChild(s)
+                      })
+                    }
+                    const options = {
+                      key: j.key_id,
+                      amount: j.order.amount,
+                      currency: j.order.currency,
+                      name: selectedHotel.name,
+                      description: `Hotel booking for ${selectedHotel.name}`,
+                      order_id: j.order.id,
+                      handler: async (resp: any) => {
+                        toast.success('Payment successful')
+                        setHotelDialogOpen(false)
+                        setSelectedHotel(null)
+                      },
+                      prefill: { contact: selectedHotel.phone || '' },
+                      theme: { color: '#F97316' }
+                    }
+                    const rzp = new (window as any).Razorpay(options)
+                    rzp.open()
+                    return
+                  } catch (err:any) {
+                    console.error('Razorpay checkout failed', err)
+                    toast.error('Payment failed to start')
+                    // fallthrough to success message for request creation
+                  }
+                }
+
+                toast.success('Booking request submitted')
+                setHotelDialogOpen(false)
+                setSelectedHotel(null)
               }}
             >
               <ExternalLink className="w-4 h-4 mr-2"/> Confirm Booking
@@ -1038,11 +1077,165 @@ export function BookingPanel(){
                 const payload = { type: 'dining', item: selectedDining, monasteryId, reservation: diningReservation, guests: count, bill: { perPerson, subtotal, gstRate, gstAmt, total } }
                 const r = await fetch('/api/services/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
                 const j = await r.json()
-                if (r.ok) { toast.success('Table request submitted'); setDiningDialogOpen(false); setSelectedDining(null); setDiningReservation({ date:'', time:'' }) }
-                else toast.error(j.error||'Failed')
+                if (!r.ok) { toast.error(j.error || 'Failed'); return }
+
+                if (j?.order) {
+                  try {
+                    if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+                      await new Promise<void>((resolve, reject) => {
+                        const s = document.createElement('script')
+                        s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+                        s.onload = () => resolve()
+                        s.onerror = () => reject(new Error('Failed to load Razorpay SDK'))
+                        document.head.appendChild(s)
+                      })
+                    }
+                    const options = {
+                      key: j.key_id,
+                      amount: j.order.amount,
+                      currency: j.order.currency,
+                      name: selectedDining.name,
+                      description: `Dining reservation at ${selectedDining.name}`,
+                      order_id: j.order.id,
+                      handler: async (resp: any) => {
+                        toast.success('Payment successful')
+                        setDiningDialogOpen(false)
+                        setSelectedDining(null)
+                        setDiningReservation({ date:'', time:'' })
+                      },
+                      prefill: { contact: selectedDining.phone || '' },
+                      theme: { color: '#F97316' }
+                    }
+                    const rzp = new (window as any).Razorpay(options)
+                    rzp.open()
+                    return
+                  } catch (err:any) {
+                    console.error('Razorpay checkout failed', err)
+                    toast.error('Payment failed to start')
+                  }
+                }
+
+                toast.success('Table request submitted')
+                setDiningDialogOpen(false)
+                setSelectedDining(null)
+                setDiningReservation({ date:'', time:'' })
               }}
             >
               <ExternalLink className="w-4 h-4 mr-2"/> Confirm Reservation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Tours Booking Dialog */}
+      <Dialog open={toursDialogOpen} onOpenChange={(o)=>{ setToursDialogOpen(o); if (!o) { setSelectedTour(null); setTourReservation({ date: '', time: '' }) } }}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-extrabold text-primary">Book Experience</DialogTitle>
+            <DialogDescription>Select date and time for your experience.</DialogDescription>
+          </DialogHeader>
+          {selectedTour && (
+            <div className="space-y-4">
+              <div className="rounded-xl p-4 bg-gradient-to-r from-[#6a2b2b] via-[#6f2d2d] to-[#5a2424] text-white border border-white/10">
+                <div className="text-lg font-semibold">{selectedTour.name}</div>
+                {selectedTour.distanceKm !== undefined && (
+                  <div className="text-amber-100/90 mt-1 inline-flex items-center gap-2"><MapPin className="w-4 h-4" /> {Number(selectedTour.distanceKm).toFixed(2)} km from {m?.name}</div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Date</div>
+                  <input type="date" className="mt-1 w-full h-10 rounded-md border px-3" value={tourReservation.date} onChange={(e)=> setTourReservation(p=>({ ...p, date: e.target.value }))} />
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Time</div>
+                  <input type="time" className="mt-1 w-full h-10 rounded-md border px-3" value={tourReservation.time} onChange={(e)=> setTourReservation(p=>({ ...p, time: e.target.value }))} />
+                </div>
+              </div>
+              {(() => {
+                const perPerson = Number(selectedTour.priceINR || 0)
+                const count = Math.max(1, Number(guests || 1))
+                const subtotal = perPerson * count
+                const gstRate = 0.05
+                const gstPct = Math.round(gstRate * 100)
+                const gstAmt = Math.round(subtotal * gstRate)
+                const total = subtotal + gstAmt
+                return (
+                  <div className="rounded-xl border p-4">
+                    <div className="text-primary font-semibold mb-2">Bill Summary</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center justify-between"><span>Price per person</span><span>₹{formatINR(perPerson)}</span></div>
+                      <div className="flex items-center justify-between"><span>Guests</span><span>{count}</span></div>
+                      <div className="flex items-center justify-between font-medium"><span>Subtotal</span><span>₹{formatINR(subtotal)}</span></div>
+                      <div className="flex items-center justify-between"><span>GST ({gstPct}%)</span><span>₹{formatINR(gstAmt)}</span></div>
+                      <div className="h-px bg-border my-2" />
+                      <div className="flex items-center justify-between text-lg font-extrabold"><span>Total</span><span>₹{formatINR(total)}</span></div>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">Final confirmation depends on availability.</div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              disabled={!tourReservation.date || !tourReservation.time}
+              className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
+              onClick={async()=>{
+                if (!selectedTour) return
+                const perPerson = Number(selectedTour.priceINR || 0)
+                const count = Math.max(1, Number(guests || 1))
+                const subtotal = perPerson * count
+                const gstRate = 0.05
+                const gstAmt = Math.round(subtotal * gstRate)
+                const total = subtotal + gstAmt
+                const payload = { type: 'tours', item: selectedTour, monasteryId, reservation: tourReservation, guests: count, bill: { perPerson, subtotal, gstRate, gstAmt, total } }
+                const r = await fetch('/api/services/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+                const j = await r.json()
+                if (!r.ok) { toast.error(j.error||'Failed'); return }
+
+                if (j?.order) {
+                  try {
+                    if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+                      await new Promise<void>((resolve, reject) => {
+                        const s = document.createElement('script')
+                        s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+                        s.onload = () => resolve()
+                        s.onerror = () => reject(new Error('Failed to load Razorpay SDK'))
+                        document.head.appendChild(s)
+                      })
+                    }
+                    const options = {
+                      key: j.key_id,
+                      amount: j.order.amount,
+                      currency: j.order.currency,
+                      name: selectedTour.name,
+                      description: `Tour booking for ${selectedTour.name}`,
+                      order_id: j.order.id,
+                      handler: async (resp: any) => {
+                        toast.success('Payment successful')
+                        setToursDialogOpen(false)
+                        setSelectedTour(null)
+                        setTourReservation({ date:'', time:'' })
+                      },
+                      prefill: { contact: selectedTour.phone || '' },
+                      theme: { color: '#F97316' }
+                    }
+                    const rzp = new (window as any).Razorpay(options)
+                    rzp.open()
+                    return
+                  } catch (err:any) {
+                    console.error('Razorpay checkout failed', err)
+                    toast.error('Payment failed to start')
+                  }
+                }
+
+                toast.success('Request recorded')
+                setToursDialogOpen(false)
+                setSelectedTour(null)
+                setTourReservation({ date:'', time:'' })
+              }}
+            >
+              <ExternalLink className="w-4 h-4 mr-2"/> Confirm Booking
             </Button>
           </DialogFooter>
         </DialogContent>

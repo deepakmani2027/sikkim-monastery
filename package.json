@@ -74,6 +74,13 @@
     "vaul": "^0.9.9",
     "zod": "3.25.67"
   },
+  "optionalDependencies": {
+    "razorpay": "^2.0.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "body-parser": "^1.20.2"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
     "@types/leaflet": "^1.9.20",

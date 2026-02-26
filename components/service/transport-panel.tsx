@@ -421,7 +421,39 @@ export function TransportPanel() {
                     size="sm"
                     className="relative z-[1] mt-4 w-full h-11 rounded-2xl text-base bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
                     onClick={async()=>{
-                      await fetch('/api/services/requests',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'transport', details: opt })})
+                      const payload = { type: 'transport', details: opt, bill: { total: Number(opt.estimatedPriceINR || 0) } }
+                      const r = await fetch('/api/services/requests',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+                      const j = await r.json()
+                      if (!r.ok) { toast.error(j.error||'Failed'); return }
+                      if (j?.order) {
+                        try {
+                          if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+                            await new Promise<void>((resolve, reject) => {
+                              const s = document.createElement('script')
+                              s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+                              s.onload = () => resolve()
+                              s.onerror = () => reject(new Error('Failed to load Razorpay SDK'))
+                              document.head.appendChild(s)
+                            })
+                          }
+                          const options = {
+                            key: j.key_id,
+                            amount: j.order.amount,
+                            currency: j.order.currency,
+                            name: `Transport to ${opt.destination || ''}`,
+                            description: `Transport booking`,
+                            order_id: j.order.id,
+                            handler: async (resp: any) => { toast.success('Payment successful') },
+                            theme: { color: '#F97316' }
+                          }
+                          const rzp = new (window as any).Razorpay(options)
+                          rzp.open()
+                          return
+                        } catch (err:any) {
+                          console.error('Razorpay checkout failed', err)
+                          toast.error('Payment failed to start')
+                        }
+                      }
                       toast.success('Booked request recorded')
                     }}
                   >
