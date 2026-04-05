@@ -321,6 +321,31 @@ async def chat(request: ChatRequest):
 @app.post("/api/anam/session-token")
 async def create_anam_session():
     try:
+        # Validate required environment variables
+        if not ANAM_API_KEY:
+            print("ERROR: ANAM_API_KEY is not set")
+            raise HTTPException(status_code=500, detail="Anam API key not configured")
+        if not ANAM_AVATAR_ID:
+            print("ERROR: ANAM_AVATAR_ID is not set")
+            raise HTTPException(status_code=500, detail="Anam Avatar ID not configured")
+        
+        print(f"Creating Anam session with Avatar ID: {ANAM_AVATAR_ID}")
+        print(f"Using voice ID: {ANAM_VOICE_ID if ANAM_VOICE_ID and ANAM_VOICE_ID != 'disabled' else 'disabled (using ElevenLabs)'}")
+        
+        # Prepare payload - voiceId should be null or omitted if disabled
+        payload = {
+            "personaConfig": {
+                "name": "Tenzin",
+                "avatarId": ANAM_AVATAR_ID,
+                "llmId": "0934d97d-0c3a-4f33-91b0-5e136a0ef466",
+                "systemPrompt": TENZIN_SYSTEM_PROMPT,
+            }
+        }
+        
+        # Only include voiceId if it's not disabled
+        if ANAM_VOICE_ID and ANAM_VOICE_ID != "disabled":
+            payload["personaConfig"]["voiceId"] = ANAM_VOICE_ID
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://api.anam.ai/v1/auth/session-token",
@@ -328,28 +353,34 @@ async def create_anam_session():
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {ANAM_API_KEY}",
                 },
-                json={
-                    "personaConfig": {
-                        "name": "Tenzin",
-                        "avatarId": ANAM_AVATAR_ID,
-                        "voiceId": ANAM_VOICE_ID,
-                        "llmId": "0934d97d-0c3a-4f33-91b0-5e136a0ef466",
-                        "systemPrompt": TENZIN_SYSTEM_PROMPT,
-                    }
-                },
+                json=payload,
                 timeout=30.0,
             )
             
+            print(f"Anam API response status: {response.status_code}")
+            
             if response.status_code != 200:
-                print(f"Anam API error: {response.status_code} - {response.text}")
-                raise HTTPException(status_code=502, detail=f"Failed to create Anam session: {response.text}")
+                error_text = response.text
+                print(f"Anam API error: {response.status_code} - {error_text}")
+                raise HTTPException(status_code=502, detail=f"Anam API error: {error_text}")
             
             data = response.json()
-            return {"sessionToken": data.get("sessionToken")}
+            session_token = data.get("sessionToken")
+            if not session_token:
+                print(f"ERROR: No sessionToken in response: {data}")
+                raise HTTPException(status_code=502, detail="No session token in Anam response")
+            
+            print(f"Successfully created Anam session")
+            return {"sessionToken": session_token}
     
     except httpx.RequestError as e:
-        print(f"Anam request error: {e}")
-        raise HTTPException(status_code=502, detail="Failed to connect to Anam API")
+        print(f"Anam request error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Anam connection error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in Anam session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 @app.get("/api/travel-tips")

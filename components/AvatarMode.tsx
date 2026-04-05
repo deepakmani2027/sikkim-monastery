@@ -26,13 +26,19 @@ export default function AvatarMode() {
         headers: { 'Content-Type': 'application/json' },
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || `Session token failed: ${res.status}`);
+        const errorMsg = data.detail || `HTTP ${res.status}`;
+        console.error('Session token error:', errorMsg);
+        throw new Error(errorMsg);
       }
 
-      const { sessionToken } = await res.json();
-      if (!sessionToken) throw new Error('No session token received');
+      const { sessionToken } = data;
+      if (!sessionToken) {
+        console.error('No sessionToken in response:', data);
+        throw new Error('Server returned no session token');
+      }
 
       setStatusMsg('Connecting to Tenzin...');
 
@@ -52,7 +58,8 @@ export default function AvatarMode() {
     } catch (err) {
       console.error('Anam session error:', err);
       setStatus('error');
-      setStatusMsg(err instanceof Error ? err.message : 'Connection failed. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setStatusMsg(`Error: ${errorMessage}`);
       // Clean up on error
       if (clientRef.current) {
         try { clientRef.current.stopStreaming(); } catch (e) {}
