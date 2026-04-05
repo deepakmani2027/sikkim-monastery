@@ -7,7 +7,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/hooks/use-auth"
 import { Suspense } from "react"
+// @ts-expect-error - CSS imports in Next.js
 import "./globals.css"
+// @ts-expect-error - CSS imports in Next.js
 import "leaflet/dist/leaflet.css"
 import { Toaster } from "@/components/ui/sonner"
 import { Watermark } from "@/components/branding/Watermark"

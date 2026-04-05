@@ -88,24 +88,16 @@ export default function AvatarMode() {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6" data-testid="avatar-mode">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden w-full" data-testid="avatar-mode">
       {/* Avatar Area */}
-      <div className="relative w-56 h-56 mb-6">
-        {/* Pulsing rings when connected */}
-        {status === 'connected' && (
-          <>
-            <div className="absolute inset-0 rounded-2xl border-2 border-monk-red/20 animate-ping" style={{ animationDuration: '3s' }} />
-            <div className="absolute inset-2 rounded-2xl border border-monk-red/15 animate-ping" style={{ animationDuration: '3.5s', animationDelay: '0.5s' }} />
-          </>
-        )}
-
+      <div className="relative w-64 h-64 mb-6 rounded-3xl overflow-hidden shadow-lg">
         {/* Video element for Anam avatar stream */}
         <video
           ref={videoRef}
           id="tenzin-avatar-video"
           autoPlay
           playsInline
-          className={`w-full h-full rounded-2xl object-cover border-2 border-sage/30 bg-sand ${
+          className={`w-full h-full rounded-3xl object-cover bg-sand ${
             status === 'connected' ? 'block' : 'hidden'
           }`}
           data-testid="avatar-video"
@@ -113,7 +105,7 @@ export default function AvatarMode() {
 
         {/* Static avatar shown when not connected */}
         {status !== 'connected' && (
-          <div className="w-full h-full rounded-2xl overflow-hidden border-2 border-sage/30 bg-sand">
+          <div className="w-full h-full rounded-3xl overflow-hidden bg-sand">
             <img
               src={MONK_AVATAR_IMG}
               alt="Tenzin Avatar"
@@ -125,32 +117,32 @@ export default function AvatarMode() {
       </div>
 
       {/* Status text */}
-      <p className="font-body text-sm text-forest-light mb-2 text-center" data-testid="avatar-status">
+      <p className="font-body text-sm text-forest-light mb-1 text-center" data-testid="avatar-status">
         {statusMsg}
       </p>
 
       {status === 'connected' && (
-        <p className="font-body text-xs text-sage mb-4 text-center">
+        <p className="font-body text-xs text-sage mb-3 text-center px-2">
           Speak naturally. Tenzin will respond with voice and animation.
         </p>
       )}
 
       {/* Controls */}
-      <div className="flex items-center gap-4 mt-2">
+      <div className="flex items-center gap-3 mt-2 flex-wrap justify-center">
         {(status === 'idle' || status === 'error') && (
           <button
             onClick={startSession}
-            className="flex items-center gap-2 bg-monk-red text-bone px-6 py-3 rounded-full font-body text-sm font-medium hover:bg-monk-red/90 transition-all duration-300 hover:shadow-lg hover:shadow-monk-red/20"
+            className="flex items-center gap-2 bg-green-500 text-white px-8 py-3 rounded-full font-body text-sm font-medium hover:bg-red-950 transition-all duration-300 whitespace-nowrap"
             data-testid="start-voice-btn"
           >
-            <Phone size={16} />
-            Start Voice Session
+            <Phone size={18} />
+            Start Session
           </button>
         )}
 
         {status === 'connecting' && (
-          <div className="flex items-center gap-2 bg-sand text-forest-light px-6 py-3 rounded-full font-body text-sm">
-            <div className="w-4 h-4 border-2 border-monk-red/40 border-t-monk-red rounded-full animate-spin" />
+          <div className="flex items-center gap-2 bg-sand text-forest-light px-4 py-2 rounded-full font-body text-xs">
+            <div className="w-3 h-3 border-2 border-monk-red/40 border-t-monk-red rounded-full animate-spin" />
             Connecting...
           </div>
         )}
@@ -158,10 +150,10 @@ export default function AvatarMode() {
         {status === 'connected' && (
           <button
             onClick={stopSession}
-            className="flex items-center gap-2 bg-forest text-bone px-6 py-3 rounded-full font-body text-sm font-medium hover:bg-forest/90 transition-all duration-300"
+            className="flex items-center gap-2 bg-red-900 text-white px-8 py-3 rounded-full font-body text-sm font-medium hover:bg-red-950 transition-all duration-300 whitespace-nowrap"
             data-testid="stop-voice-btn"
           >
-            <PhoneOff size={16} />
+            <PhoneOff size={18} />
             End Session
           </button>
         )}
@@ -169,15 +161,15 @@ export default function AvatarMode() {
 
       {/* Error retry hint */}
       {status === 'error' && (
-        <p className="font-body text-xs text-monk-red/70 mt-3 text-center max-w-xs">
-          Tip: Make sure to allow microphone access when prompted by your browser.
+        <p className="font-body text-xs text-monk-red/70 mt-2 text-center max-w-xs px-2">
+          Tip: Allow microphone access when prompted by your browser.
         </p>
       )}
 
       {/* Info */}
-      <div className="mt-6 text-center">
-        <p className="font-body text-xs text-forest-light/60 leading-relaxed max-w-xs">
-          Voice mode uses your microphone. Allow access when prompted. The avatar will respond with speech and facial expressions.
+      <div className="mt-4 text-center max-h-20 overflow-hidden">
+        <p className="font-body text-xs text-forest-light/60 leading-relaxed max-w-xs px-2">
+          Voice mode uses your microphone. The avatar will respond with speech and facial expressions.
         </p>
       </div>
     </div>
