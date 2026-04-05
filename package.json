@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anam-ai/js-sdk": "^4.12.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -75,11 +76,11 @@
     "zod": "3.25.67"
   },
   "optionalDependencies": {
-    "razorpay": "^2.0.0",
-    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "body-parser": "^1.20.2"
+    "express": "^4.18.2",
+    "razorpay": "^2.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
