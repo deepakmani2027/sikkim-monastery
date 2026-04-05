@@ -11,6 +11,7 @@ import "./globals.css"
 import "leaflet/dist/leaflet.css"
 import { Toaster } from "@/components/ui/sonner"
 import { Watermark } from "@/components/branding/Watermark"
+import ChatbotWidget from "@/components/ChatbotWidget"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -63,6 +64,7 @@ export default function RootLayout({
           </Suspense>
           <Analytics />
           <Toaster richColors position="top-center" />
+          <ChatbotWidget />
         </ThemeProvider>
       </body>
     </html>
