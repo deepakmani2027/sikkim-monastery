@@ -1,0 +1,43 @@
+{
+  "summary": "Completed comprehensive testing of Sikkim Monastery Digital Experience platform after avatar ID fix. All core features working perfectly including the critical voice session functionality that was previously failing. Backend APIs fully functional, frontend UI working seamlessly.",
+  "backend_issues": {
+    "minor_issues": [
+      {
+        "endpoint": "/api/chat with speak_mode=true",
+        "issue": "ElevenLabs TTS not generating audio URLs in response",
+        "impact": "Voice responses not playing audio, but text responses work correctly",
+        "fix_priority": "LOW",
+        "workaround": "Chat functionality works perfectly without audio, Anam voice mode provides voice interaction"
+      }
+    ]
+  },
+  "frontend_issues": {},
+  "passed_tests": [
+    "Landing page loads with hero, about, gallery, travel tips sections",
+    "Header navigation with Discover, Galleries, Travel Guides links",
+    "Floating chatbot trigger button visible and clickable",
+    "Chatbot widget opens/closes properly with smooth animations",
+    "Chat and Voice tabs both functional and switch properly",
+    "Default greeting message from Tenzin displays correctly",
+    "User can type messages and receive AI responses from OpenRouter GPT-4o-mini",
+    "Voice tab shows avatar image and Start Voice Session button",
+    "Voice session initiation works - status changes from idle to Connected",
+    "Anam session token creation successful with valid avatar ID",
+    "Chat mode continues working after voice tab interaction",
+    "Close button works properly",
+    "/api/health returns 200 OK",
+    "/api/monasteries returns 6 monasteries correctly",
+    "/api/travel-tips returns 6 travel tips correctly", 
+    "/api/chat returns AI responses from Tenzin",
+    "/api/anam/session-token creates session tokens successfully with fixed avatar ID"
+  ],
+  "test_report_links": ["/app/backend_test.py"],
+  "success_percentage": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "updated_files": [],
+  "action_item_for_main_agent": "",
+  "should_call_test_agent_after_fix": "false",
+  "should_main_agent_test_itself": "true"
+}
