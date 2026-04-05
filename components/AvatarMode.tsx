@@ -132,10 +132,11 @@ export default function AvatarMode() {
           ref={videoRef}
           id="tenzin-avatar-video"
           autoPlay
-          muted
           playsInline
+          controls={false}
           className="w-full h-full rounded-3xl object-cover bg-sand"
           data-testid="avatar-video"
+          style={{ width: '100%', height: '100%' }}
         />
 
         {/* Static avatar shown when not connected */}
