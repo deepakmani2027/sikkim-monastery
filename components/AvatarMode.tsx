@@ -17,10 +17,19 @@ export default function AvatarMode() {
 
   const startSession = useCallback(async () => {
     try {
+      console.log('[Avatar] Starting session...');
       setStatus('connecting');
       setStatusMsg('Creating session...');
 
+      // Verify video element exists
+      const videoElement = document.getElementById('tenzin-avatar-video') as HTMLVideoElement;
+      if (!videoElement) {
+        throw new Error('Video element not found in DOM');
+      }
+      console.log('[Avatar] Video element found:', videoElement);
+
       // Get session token from backend
+      console.log('[Avatar] Fetching session token from:', API_URL);
       const res = await fetch(`${API_URL}/api/anam/session-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -30,33 +39,53 @@ export default function AvatarMode() {
 
       if (!res.ok) {
         const errorMsg = data.detail || `HTTP ${res.status}`;
-        console.error('Session token error:', errorMsg);
+        console.error('[Avatar] Session token error:', errorMsg);
         throw new Error(errorMsg);
       }
 
       const { sessionToken } = data;
       if (!sessionToken) {
-        console.error('No sessionToken in response:', data);
+        console.error('[Avatar] No sessionToken in response:', data);
         throw new Error('Server returned no session token');
       }
 
+      console.log('[Avatar] Got session token, initializing Anam SDK...');
+      setStatusMsg('Initializing avatar...');
+
       setStatusMsg('Connecting to Tenzin...');
 
-      // Create Anam client
-      const client = createClient(sessionToken, {
-        disableInputAudio: false,
-      });
+      // Create Anam client with error handling
+      let client;
+      try {
+        console.log('[Avatar] Creating SDK client...');
+        client = createClient(sessionToken, {
+          disableInputAudio: false,
+        });
+        console.log('[Avatar] SDK client created successfully');
+      } catch (sdkError) {
+        console.error('[Avatar] SDK initialization error:', sdkError);
+        throw new Error(`Failed to initialize Anam SDK: ${sdkError instanceof Error ? sdkError.message : String(sdkError)}`);
+      }
 
       clientRef.current = client;
 
-      // Stream to video element
-      await client.streamToVideoElement('tenzin-avatar-video');
+      // Stream to video element with error handling
+      try {
+        console.log('[Avatar] Starting stream to video element...');
+        await client.streamToVideoElement('tenzin-avatar-video');
+        console.log('[Avatar] Stream started successfully');
+      } catch (streamError) {
+        console.error('[Avatar] Stream error:', streamError);
+        console.error('[Avatar] Stream error type:', streamError instanceof Error ? streamError.message : typeof streamError);
+        throw new Error(`Failed to stream avatar: ${streamError instanceof Error ? streamError.message : String(streamError)}`);
+      }
 
       setStatus('connected');
       setStatusMsg('Connected! Speak to Tenzin... he is listening');
 
     } catch (err) {
-      console.error('Anam session error:', err);
+      console.error('[Avatar] Anam session error:', err);
+      console.error('[Avatar] Error stack:', err instanceof Error ? err.stack : 'no stack');
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : String(err);
       setStatusMsg(`Error: ${errorMessage}`);
@@ -103,16 +132,15 @@ export default function AvatarMode() {
           ref={videoRef}
           id="tenzin-avatar-video"
           autoPlay
+          muted
           playsInline
-          className={`w-full h-full rounded-3xl object-cover bg-sand ${
-            status === 'connected' ? 'block' : 'hidden'
-          }`}
+          className="w-full h-full rounded-3xl object-cover bg-sand"
           data-testid="avatar-video"
         />
 
         {/* Static avatar shown when not connected */}
         {status !== 'connected' && (
-          <div className="w-full h-full rounded-3xl overflow-hidden bg-sand">
+          <div className="absolute inset-0 w-full h-full rounded-3xl overflow-hidden bg-sand z-0">
             <img
               src={MONK_AVATAR_IMG}
               alt="Tenzin Avatar"
