@@ -46,3 +46,6 @@ next-env.d.ts
 /LICENSE*
 /license*
 /License*
+
+# chatbot folder - separate repository
+/chatbot/

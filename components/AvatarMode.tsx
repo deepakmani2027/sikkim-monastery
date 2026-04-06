@@ -28,6 +28,16 @@ export default function AvatarMode() {
       }
       console.log('[Avatar] Video element found:', videoElement);
 
+      // Check microphone permissions first
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream.getTracks().forEach(track => track.stop());
+        console.log('[Avatar] Microphone permission granted');
+      } catch (micError: any) {
+        console.error('[Avatar] Microphone permission denied:', micError);
+        throw new Error(`Microphone permission denied: ${micError.name}. Please allow microphone access in browser settings.`);
+      }
+
       // Get session token from backend
       console.log('[Avatar] Fetching session token from:', API_URL);
       const res = await fetch(`${API_URL}/api/anam/session-token`, {
@@ -49,7 +59,7 @@ export default function AvatarMode() {
         throw new Error('Server returned no session token');
       }
 
-      console.log('[Avatar] Got session token, initializing Anam SDK...');
+      console.log('[Avatar] Got session token (length:', sessionToken.length, ')');
       setStatusMsg('Initializing avatar...');
 
       setStatusMsg('Connecting to Tenzin...');
@@ -57,41 +67,77 @@ export default function AvatarMode() {
       // Create Anam client with error handling
       let client;
       try {
-        console.log('[Avatar] Creating SDK client...');
-        client = createClient(sessionToken, {
-          disableInputAudio: false,
-        });
+        console.log('[Avatar] Creating SDK client with sessionToken...');
+        // Follow Anam documentation: simple createClient call
+        client = createClient(sessionToken);
         console.log('[Avatar] SDK client created successfully');
-      } catch (sdkError) {
+      } catch (sdkError: any) {
         console.error('[Avatar] SDK initialization error:', sdkError);
-        throw new Error(`Failed to initialize Anam SDK: ${sdkError instanceof Error ? sdkError.message : String(sdkError)}`);
+        console.error('[Avatar] Error details:', {
+          message: sdkError.message,
+          name: sdkError.name,
+          code: sdkError.code,
+          stack: sdkError.stack
+        });
+        throw new Error(`Failed to initialize Anam SDK: ${sdkError.message || String(sdkError)}`);
       }
 
       clientRef.current = client;
 
-      // Stream to video element with error handling
+      // Stream to video element with error handling - follow Anam documentation
       try {
-        console.log('[Avatar] Starting stream to video element...');
-        await client.streamToVideoElement('tenzin-avatar-video');
-        console.log('[Avatar] Stream started successfully');
-      } catch (streamError) {
+        console.log('[Avatar] Starting stream to video element (ID: tenzin-avatar-video)...');
+        // Create stream promise
+        const streamPromise = (async () => {
+          try {
+            console.log('[Avatar] Calling streamToVideoElement...');
+            await client.streamToVideoElement('tenzin-avatar-video');
+            console.log('[Avatar] Stream method completed without error');
+            return true;
+          } catch (e) {
+            console.error('[Avatar] Stream method threw error:', e);
+            throw e;
+          }
+        })();
+        
+        // Add timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => {
+            console.error('[Avatar] Stream initialization timeout (15s)');
+            reject(new Error('Stream initialization timeout - 15 seconds elapsed'));
+          }, 15000)
+        );
+        
+        await Promise.race([streamPromise, timeoutPromise]);
+        console.log('[Avatar] Stream started successfully - Avatar is now streaming');
+      } catch (streamError: any) {
         console.error('[Avatar] Stream error:', streamError);
-        console.error('[Avatar] Stream error type:', streamError instanceof Error ? streamError.message : typeof streamError);
-        throw new Error(`Failed to stream avatar: ${streamError instanceof Error ? streamError.message : String(streamError)}`);
+        console.error('[Avatar] Stream error details:', {
+          message: streamError.message,
+          name: streamError.name,
+          code: streamError.code,
+          stack: streamError.stack
+        });
+        throw new Error(`Failed to stream avatar: ${streamError.message || String(streamError)}`);
       }
 
       setStatus('connected');
       setStatusMsg('Connected! Speak to Tenzin... he is listening');
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Avatar] Anam session error:', err);
-      console.error('[Avatar] Error stack:', err instanceof Error ? err.stack : 'no stack');
+      console.error('[Avatar] Error stack:', err.stack || 'no stack');
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : String(err);
       setStatusMsg(`Error: ${errorMessage}`);
       // Clean up on error
       if (clientRef.current) {
-        try { clientRef.current.stopStreaming(); } catch (e) {}
+        try { 
+          console.log('[Avatar] Cleaning up on error...');
+          await clientRef.current.stopStreaming(); 
+        } catch (e) {
+          console.error('[Avatar] Error during cleanup:', e);
+        }
         clientRef.current = null;
       }
     }
