@@ -51,24 +51,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const hasPersistedSession = Object.keys(window.localStorage).some(
         (key) => key.startsWith("sb-") && key.endsWith("-auth-token"),
       )
-      if (!hasPersistedSession) {
-        setLoading(false)
+      let persistedUser: { id: string; email?: string; user_metadata?: Record<string, unknown> } | undefined
+      if (hasPersistedSession) {
+        try {
+          const storageKey = Object.keys(window.localStorage).find(
+            (key) => key.startsWith("sb-") && key.endsWith("-auth-token"),
+          )
+          const storedSession = storageKey ? JSON.parse(window.localStorage.getItem(storageKey) || "null") : null
+          if (storedSession?.user?.id) {
+            persistedUser = storedSession.user
+            void refreshUser(storedSession.user.id, storedSession.user)
+          }
+        } catch (error) {
+          console.warn("[auth] Failed to read persisted session", error)
+        }
       }
+      setLoading(false)
       // Get initial session
       try {
-        if (hasPersistedSession) {
-          const sessionRequest = supabase.auth.getSession()
-          const sessionTimeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
-          const sessionResult = await Promise.race([sessionRequest, sessionTimeout])
-          if (!active) return
-          const session = sessionResult && "data" in sessionResult ? sessionResult.data.session : null
-          void refreshUser(session?.user?.id || null, session?.user)
+        const sessionRequest = supabase.auth.getSession()
+        const sessionTimeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+        const sessionResult = await Promise.race([sessionRequest, sessionTimeout])
+        if (!active) return
+        const session = sessionResult && "data" in sessionResult ? sessionResult.data.session : null
+        if (session?.user) {
+          void refreshUser(session.user.id, session.user)
+        } else if (!persistedUser) {
+          setAuthState({ user: null, isAuthenticated: false })
         }
       } catch (error) {
         console.error("[auth] Failed to restore session", error)
-        if (active) setAuthState({ user: null, isAuthenticated: false })
+        if (active && !persistedUser) setAuthState({ user: null, isAuthenticated: false })
       } finally {
-        if (active) setLoading(false)
+        window.clearTimeout(initializationDeadline)
       }
 
       // Subscribe to auth changes
