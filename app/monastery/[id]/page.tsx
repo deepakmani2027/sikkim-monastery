@@ -86,13 +86,17 @@ export default function MonasteryDetailPage() {
         if (!cand?.id) return
         const detRes = await fetch(`/api/services/places?placeId=${cand.id}`)
         const det = await detRes.json()
-        const photos: Array<{ ref: string; width: number }> = det?.result?.photos || []
+        const photos: Array<{ name?: string; ref?: string; width: number }> = det?.result?.photos || []
         if (!active) return
-        const toUrl = (ref: string, w: number) =>
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${Math.min(1600, Math.max(800, w || 1200))}&photo_reference=${encodeURIComponent(
-            ref,
-          )}&key=${encodeURIComponent(apiKey)}`
-        const urls = photos.map((p) => toUrl(p.ref, p.width))
+        const urls = photos
+          .map((p) =>
+            p.name
+              ? `/api/services/places?photoName=${encodeURIComponent(p.name)}`
+              : p.ref
+                ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${Math.min(1600, Math.max(800, p.width || 1200))}&photo_reference=${encodeURIComponent(p.ref)}&key=${encodeURIComponent(apiKey)}`
+                : null,
+          )
+          .filter((url): url is string => Boolean(url))
         setGoogleImages(urls)
       } catch {
         if (active) setGoogleImages([])

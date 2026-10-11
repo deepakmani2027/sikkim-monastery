@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button"
 import { MapPin, IndianRupee, Star, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const toRad = (value: number) => (value * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const lat1 = toRad(a.lat)
+  const lat2 = toRad(b.lat)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}
+
 export default function HotelsListPage(){
   const sp = useSearchParams()
   const monasteryId = sp.get('monasteryId') || monasteries[0]?.id
@@ -15,9 +25,29 @@ export default function HotelsListPage(){
   useEffect(()=>{
     async function load(){
       if (!m) return
-  const r = await fetch(`/api/services/nearby?near=${m.coordinates.lat},${m.coordinates.lng}&radiusKm=5`)
+      const near = `${m.coordinates.lat},${m.coordinates.lng}`
+      const google = await fetch(`/api/services/places?near=${near}&radius=10000&type=lodging&text=${encodeURIComponent(`hotels hostels guest houses near ${m.name}`)}`)
+      if (google.ok) {
+        const data = await google.json()
+        const realItems = (data.results || [])
+          .filter((it:any) => it.location?.lat != null && it.location?.lng != null)
+          .map((it:any) => ({
+            ...it,
+            placeId: it.id,
+            id: `google-${it.id}`,
+            distanceKm: haversineKm(m.coordinates, it.location),
+            priceINR: it.priceLevel === 'PRICE_LEVEL_EXPENSIVE' ? 3500 : it.priceLevel === 'PRICE_LEVEL_MODERATE' ? 2200 : 1200,
+            location: it.location,
+          }))
+          .filter((it:any) => it.distanceKm <= 10)
+        if (realItems.length) {
+          setItems(realItems)
+          return
+        }
+      }
+      const r = await fetch(`/api/services/nearby?near=${near}&radiusKm=10`)
       const j = await r.json()
-  if (r.ok) setItems((j.hotel || []).filter((it:any)=> Number(it?.distanceKm||0) <= 5))
+      if (r.ok) setItems((j.hotel || []).filter((it:any)=> Number(it?.distanceKm||0) <= 10))
     }
     load()
   },[m])

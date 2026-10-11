@@ -9,7 +9,7 @@ type Props = {
 	max?: number
 }
 
-type Photo = { ref: string; width: number; height: number; attributions?: string[] }
+type Photo = { name?: string; ref?: string; width: number; height: number; attributions?: string[] }
 
 export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 	const [photos, setPhotos] = useState<Photo[] | null>(null)
@@ -17,13 +17,14 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 	const [error, setError] = useState<string | null>(null)
 	const [loading, setLoading] = useState<boolean>(false)
 	const [limit, setLimit] = useState<number>(max)
-
 	const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 
-	const photoUrl = (ref: string, w: number) =>
-		`https://maps.googleapis.com/maps/api/place/photo?maxwidth=${Math.min(1600, Math.max(400, w))}&photo_reference=${encodeURIComponent(
-			ref
-		)}&key=${encodeURIComponent(apiKey)}`
+	const photoUrl = (photo: Photo) =>
+		photo.name
+			? `/api/services/places?photoName=${encodeURIComponent(photo.name)}`
+			: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${Math.min(1600, Math.max(400, photo.width))}&photo_reference=${encodeURIComponent(
+					photo.ref || ""
+			  )}&key=${encodeURIComponent(apiKey)}`
 
 	useEffect(() => {
 		let active = true
@@ -33,10 +34,20 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 				setError(null)
 				// Find the place by text near the monastery coordinates
 				const findRes = await fetch(
-					`/api/services/places?find=${encodeURIComponent(name)}&type=point_of_interest&near=${lat},${lng}&radius=1500`
+					`/api/services/places?text=${encodeURIComponent(`${name} Sikkim`)}&near=${lat},${lng}&radius=20000`,
 				)
-				const found = await findRes.json()
-				const cand = found.results?.[0]
+				let found = await findRes.json()
+				let cand =
+					found.results?.find((result: any) =>
+						String(result.name || "").toLowerCase().includes(name.split(" ")[0].toLowerCase()),
+					) || found.results?.[0]
+				if (!cand?.id) {
+					const fallbackRes = await fetch(
+						`/api/services/places?text=${encodeURIComponent(`monastery near ${name}`)}&near=${lat},${lng}&radius=5000`,
+					)
+					found = await fallbackRes.json()
+					cand = found.results?.[0]
+				}
 				if (!cand?.id) throw new Error("Place not found")
 				if (!active) return
 				setPlaceId(cand.id)
@@ -60,15 +71,10 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 		}
 	}, [name, lat, lng, max])
 
-	const placeLink = useMemo(() => (placeId ? `https://maps.google.com/?cid=${placeId}` : null), [placeId])
-
-	if (!apiKey) {
-		return (
-			<div className="text-sm text-muted-foreground">
-				To show Google photos, set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
-			</div>
-		)
-	}
+	const placeLink = useMemo(
+		() => (placeId ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(placeId)}` : null),
+		[placeId],
+	)
 
 	return (
 		<div className="space-y-2">
@@ -77,9 +83,9 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 			{photos && photos.length > 0 ? (
 				<div className="grid grid-cols-2 md:grid-cols-3 gap-2">
 					{photos.slice(0, limit).map((p) => (
-						<a key={p.ref} href={photoUrl(p.ref, p.width)} target="_blank" rel="noreferrer" className="block">
+						<a key={p.name || p.ref} href={photoUrl(p)} target="_blank" rel="noreferrer" className="block">
 							<img
-								src={photoUrl(p.ref, p.width)}
+								src={photoUrl(p)}
 								alt={name}
 								className="w-full h-32 md:h-40 object-cover rounded"
 								loading="lazy"
@@ -107,4 +113,3 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 		</div>
 	)
 }
-

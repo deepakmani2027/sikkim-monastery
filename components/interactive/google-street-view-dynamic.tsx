@@ -50,13 +50,15 @@ export function GoogleStreetViewDynamic({
       if (window.__googleMapsScriptLoaded) return
       if (window.__googleMapsScriptPromise) return window.__googleMapsScriptPromise
       if (!key) return
-      const src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=quarterly`
+      const callbackName = `__googleStreetViewReady_${Date.now()}`
+      const src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=${callbackName}`
       window.__googleMapsScriptPromise = new Promise<void>((resolve, reject) => {
         const script = document.createElement("script")
         script.src = src
         script.async = true
         script.defer = true
-        script.onload = () => {
+        ;(window as any)[callbackName] = () => {
+          delete (window as any)[callbackName]
           window.__googleMapsScriptLoaded = true
           resolve()
         }
@@ -76,8 +78,17 @@ export function GoogleStreetViewDynamic({
             radiusMeters
           )}`
         )
-        const j = await res.json()
-        const cand = j.results?.[0]
+        let j = await res.json()
+        let cand = j.results?.[0]
+        if (!cand?.location?.lat) {
+          const fallback = await fetch(
+            `/api/services/places?text=${encodeURIComponent(`${placeName} Sikkim`)}&near=${bias}&radius=20000`,
+          )
+          j = await fallback.json()
+          cand = j.results?.find((result: any) =>
+            String(result.name || "").toLowerCase().includes(placeName.split(" ")[0].toLowerCase()),
+          ) || j.results?.[0]
+        }
         if (cand?.location?.lat && cand?.location?.lng) return { lat: cand.location.lat, lng: cand.location.lng }
       } catch {}
       return null

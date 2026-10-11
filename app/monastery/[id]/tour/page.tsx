@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Navbar } from "@/components/layout/navbar"
 import { VirtualTour } from "@/components/interactive/virtual-tour"
 import { GoogleStreetViewDynamic } from "@/components/interactive/google-street-view-dynamic"
+import { GooglePhotosGrid } from "@/components/interactive/google-photos-grid"
 import { getMonasteryById } from "@/lib/monasteries"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
@@ -33,7 +34,7 @@ export default function VirtualTourPage() {
     )
   }
 
-  if (!isAuthenticated || !monastery || !monastery.virtualTour?.available) {
+  if (!isAuthenticated || !monastery) {
     return null
   }
 
@@ -50,13 +51,27 @@ export default function VirtualTourPage() {
           </Button>
         </div>
 
-        {/* Google 360 Street View (if available at monastery location) */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">{monastery.name} Virtual Tour</h1>
+          <p className="text-muted-foreground">
+            Explore verified Google Street View imagery and media for this monastery. Availability depends on Google coverage at the exact location.
+          </p>
+        </div>
+
+        {/* Google 360 Street View for every monastery with available coverage */}
         <div className="relative mb-6">
           <GoogleStreetViewDynamic lat={monastery.coordinates.lat} lng={monastery.coordinates.lng} placeName={monastery.name} />
         </div>
 
-        {/* Virtual Tour (site-curated panoramas) */}
-        <VirtualTour monasteryId={monastery.id} scenes={monastery.virtualTour.scenes || []} />
+        <section className="rounded-2xl border bg-card p-5 mb-6">
+          <h2 className="text-xl font-semibold mb-3">Google media</h2>
+          <GooglePhotosGrid name={monastery.name} lat={monastery.coordinates.lat} lng={monastery.coordinates.lng} />
+        </section>
+
+        {/* Site-curated panoramas, when verified scenes exist for this monastery */}
+        {monastery.virtualTour?.scenes?.length ? (
+          <VirtualTour monasteryId={monastery.id} scenes={monastery.virtualTour.scenes} />
+        ) : null}
       </main>
     </div>
   )

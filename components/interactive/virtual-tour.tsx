@@ -174,16 +174,24 @@ export function VirtualTour({ monasteryId, scenes }: VirtualTourProps) {
     if (api?.toggleFullscreen) api.toggleFullscreen()
   }
 
-  const toggleGyro = () => {
+  const toggleGyro = async () => {
     const api = apiRef.current
     if (!api) return
     if (gyroOn) {
       api.stopOrientation?.()
       setGyroOn(false)
-    } else {
-      api.startOrientation?.()
-      setGyroOn(true)
+      return
     }
+    const orientation = window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">
+    }
+    if (orientation?.requestPermission) {
+      const permission = await orientation.requestPermission()
+      if (permission !== "granted") return
+    }
+    const viewer = api.getViewer?.(`vt-${monasteryId}`) || api
+    viewer.startOrientation?.()
+    setGyroOn(true)
   }
 
   const handleHotspotClick = (sceneId?: string) => {
@@ -466,7 +474,7 @@ export function VirtualTour({ monasteryId, scenes }: VirtualTourProps) {
                   <Button aria-label={showHotspots ? "Hide hotspots" : "Show hotspots"} variant="ghost" size="sm" onClick={() => setShowHotspots((s) => !s)} className="text-white hover:bg-white/20">
                     <Info className={`h-4 w-4 ${showHotspots ? "text-white" : "text-white/60"}`} />
                   </Button>
-                  <Button aria-label="Toggle device orientation" variant="ghost" size="sm" onClick={toggleGyro} className="text-white hover:bg-white/20">
+                  <Button aria-label={gyroOn ? "Disable VR device orientation" : "Enable VR device orientation"} title="VR device orientation" variant="ghost" size="sm" onClick={toggleGyro} className="text-white hover:bg-white/20">
                     <Smartphone className={`h-4 w-4 ${gyroOn ? "text-green-400" : ""}`} />
                   </Button>
                   <Button aria-label="Enter fullscreen" variant="ghost" size="sm" onClick={toggleFullscreen} className="text-white hover:bg-white/20">

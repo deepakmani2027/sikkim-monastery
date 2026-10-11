@@ -4,9 +4,21 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { Navbar } from "@/components/layout/navbar"
-import { TouristDashboard } from "@/components/dashboard/tourist-dashboard"
-import { ResearcherDashboard } from "@/components/dashboard/researcher-dashboard"
-import { AdminDashboard } from "@/components/dashboard/admin-dashboard"
+import dynamic from "next/dynamic"
+
+const TouristDashboard = dynamic(() => import("@/components/dashboard/tourist-dashboard").then((mod) => mod.TouristDashboard), {
+  loading: () => <DashboardSectionLoading />,
+})
+const ResearcherDashboard = dynamic(() => import("@/components/dashboard/researcher-dashboard").then((mod) => mod.ResearcherDashboard), {
+  loading: () => <DashboardSectionLoading />,
+})
+const AdminDashboard = dynamic(() => import("@/components/dashboard/admin-dashboard").then((mod) => mod.AdminDashboard), {
+  loading: () => <DashboardSectionLoading />,
+})
+
+function DashboardSectionLoading() {
+  return <div className="min-h-[420px] animate-pulse rounded-lg bg-muted/40" />
+}
 
 export default function DashboardPage() {
   const { user, isAuthenticated, loading } = useAuth()
