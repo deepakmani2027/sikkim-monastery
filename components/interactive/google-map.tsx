@@ -12,6 +12,7 @@ declare global {
       class Marker { constructor(opts: any); setMap(m: Map | null): void; addListener(ev: string, cb: () => void): void }
       class Polyline { constructor(opts: any); setMap(m: Map | null): void }
       class Size { constructor(w: number, h: number) }
+      class Point { constructor(x: number, y: number) }
       class LatLngBounds { constructor(); extend(c: LatLngLiteral): void }
       interface Padding { top?: number; bottom?: number; left?: number; right?: number }
     }
@@ -27,11 +28,16 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
   if ((window as any).google?.maps) return Promise.resolve()
   if (mapsScriptPromise) return mapsScriptPromise
   mapsScriptPromise = new Promise((resolve, reject) => {
+    const callbackName = `__googleMapsReady_${Date.now()}`
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    ;(window as any)[callbackName] = () => {
+      delete (window as any)[callbackName]
+      resolve()
+    }
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly&loading=async&callback=${callbackName}`
     script.async = true
+    script.defer = true
     script.onerror = () => reject(new Error('Failed to load Google Maps'))
-    script.onload = () => resolve()
     document.head.appendChild(script)
   })
   return mapsScriptPromise
@@ -98,7 +104,13 @@ export function GoogleMap({ center, zoom = 9, className = "h-full w-full", marke
         position: m.position,
         map: mapRef.current!,
         title: m.title,
-        icon: m.iconUrl ? { url: m.iconUrl, scaledSize: new google.maps.Size(36, 36) } : undefined,
+        icon: m.iconUrl
+          ? {
+              url: m.iconUrl,
+              scaledSize: new google.maps.Size(18, 27),
+              anchor: new google.maps.Point(9, 27),
+            }
+          : undefined,
       })
       if (m.onClick) marker.addListener('click', m.onClick)
       markersRef.current.push(marker)

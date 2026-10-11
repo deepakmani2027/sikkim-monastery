@@ -155,7 +155,11 @@ export default function DirectionsPage() {
       setLoadingRoute(true)
       setError(null)
       const origin = `${userLoc.lat},${userLoc.lon}`
-      const destination = `${monastery.coordinates.lat},${monastery.coordinates.lng}`
+      const destinationPoint = refinedMonastery ?? {
+        lat: monastery.coordinates.lat,
+        lng: monastery.coordinates.lng,
+      }
+      const destination = `${destinationPoint.lat},${destinationPoint.lng}`
       try {
         const resp = await fetch(`/api/directions?origin=${origin}&destination=${destination}&modes=driving,walking`)
         if (!resp.ok) throw new Error('directions failed')
@@ -164,10 +168,18 @@ export default function DirectionsPage() {
         const walking = data.routes?.find((r:any)=> r.mode === 'walking')
         if (driving && driving.polyline?.path?.length){
           const coords: [number, number][] = driving.polyline.path.map((p:any)=> [p.lat, p.lng])
+          if (coords.length > 1) {
+            coords[0] = [userLoc.lat, userLoc.lon]
+            coords[coords.length - 1] = [destinationPoint.lat, destinationPoint.lng]
+          }
           setRouteDriving({ coords, distance: driving.distanceMeters, duration: driving.durationSeconds })
         } else setRouteDriving(null)
         if (walking && walking.polyline?.path?.length){
           const coords: [number, number][] = walking.polyline.path.map((p:any)=> [p.lat, p.lng])
+          if (coords.length > 1) {
+            coords[0] = [userLoc.lat, userLoc.lon]
+            coords[coords.length - 1] = [destinationPoint.lat, destinationPoint.lng]
+          }
           setRouteWalking({ coords, distance: walking.distanceMeters, duration: walking.durationSeconds })
         } else setRouteWalking(null)
       } catch (e){
@@ -179,7 +191,7 @@ export default function DirectionsPage() {
       }
     }
     fetchRoutes()
-  }, [userLoc, monastery])
+  }, [userLoc, monastery, refinedMonastery])
 
   // Fetch nearest airport using Overpass (dynamic, with fallback)
   useEffect(() => {

@@ -1,16 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Proxy to Google Directions API to avoid exposing key directly on client for route fetch.
-// Query params: origin=lat,lng&destination=lat,lng&modes=driving,walking,transit
-// Returns shape { routes: { mode, distanceMeters, durationSeconds, polyline: { path: [ {lat,lng} ] } }[] }
+import { computeGoogleRoute, optimizeGoogleRoute, parseLatLng, type LatLng } from '@/lib/google-maps'
 
 export const dynamic = 'force-dynamic'
 
-function parseLatLng(val: string | null): { lat: number; lng: number } | null {
-  if (!val) return null
-  const parts = val.split(',').map(v=> Number(v.trim()))
-  if (parts.length !== 2 || parts.some(isNaN)) return null
-  return { lat: parts[0], lng: parts[1] }
+async function fallbackWaypointOrder(waypoints: LatLng[]): Promise<number[]> {
+  const remaining = waypoints.slice(1, -1).map((_, index) => index)
+  const order: number[] = []
+  let current = 0
+
+  while (remaining.length) {
+    const candidates = await Promise.all(
+      remaining.map(async (index) => {
+        try {
+          const route = await computeGoogleRoute(waypoints[current], waypoints[index + 1], 'DRIVE')
+          return { index, distance: route.distanceMeters || Number.POSITIVE_INFINITY }
+        } catch {
+          return { index, distance: Number.POSITIVE_INFINITY }
+        }
+      }),
+    )
+    candidates.sort((a, b) => a.distance - b.distance)
+    const next = candidates[0]
+    if (!next || !Number.isFinite(next.distance)) {
+      order.push(...remaining)
+      break
+    }
+    order.push(next.index)
+    current = next.index + 1
+    remaining.splice(remaining.indexOf(next.index), 1)
+  }
+
+  return order
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const waypoints = Array.isArray(body?.waypoints)
+      ? body.waypoints.map((point: unknown) => {
+          if (!point || typeof point !== "object") return null
+          const value = point as { lat?: unknown; lng?: unknown }
+          const lat = Number(value.lat)
+          const lng = Number(value.lng)
+          return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
+        })
+      : []
+
+    if (
+      waypoints.length < 2 ||
+      waypoints.length > 27 ||
+      waypoints.some((point: { lat: number; lng: number } | null) => !point)
+    ) {
+      return NextResponse.json({ error: "At least two valid waypoints are required." }, { status: 400 })
+    }
+
+    const route = await optimizeGoogleRoute(waypoints as Array<{ lat: number; lng: number }>)
+    const hasUsableOrder =
+      route.optimizedIntermediateWaypointIndex.length === waypoints.length - 2 &&
+      route.optimizedIntermediateWaypointIndex.every(
+        (index, position) =>
+          Number.isInteger(index) && index >= 0 && index < waypoints.length - 2 && !route.optimizedIntermediateWaypointIndex.slice(0, position).includes(index),
+      )
+    const optimizedIntermediateWaypointIndex = hasUsableOrder
+      ? route.optimizedIntermediateWaypointIndex
+      : await fallbackWaypointOrder(waypoints as Array<{ lat: number; lng: number }>)
+    return NextResponse.json({
+      optimizedIntermediateWaypointIndex,
+      distanceMeters: route.distanceMeters,
+      durationSeconds: route.durationSeconds,
+      polyline: { path: route.path },
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Google route optimization failed." },
+      { status: 502 },
+    )
+  }
 }
 
 export async function GET(req: NextRequest){
@@ -24,59 +89,36 @@ export async function GET(req: NextRequest){
     return NextResponse.json({ error: 'Invalid origin/destination' }, { status: 400 })
   }
   const modes = modesParam.split(',').map(m=> m.trim()).filter(Boolean)
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-  if (!apiKey){
-    return NextResponse.json({ error: 'Directions API not configured' }, { status: 503 })
-  }
-
   const results: any[] = []
+  const errors: Array<{ mode: string; error: string }> = []
 
   for (const mode of modes){
     const travelMode = mode.toLowerCase()
     if (!['driving','walking','transit','bicycling'].includes(travelMode)) continue
     try {
-      // Using Directions API REST
-      const url = new URL('https://maps.googleapis.com/maps/api/directions/json')
-      url.searchParams.set('origin', `${origin.lat},${origin.lng}`)
-      url.searchParams.set('destination', `${destination.lat},${destination.lng}`)
-      url.searchParams.set('mode', travelMode)
-      url.searchParams.set('key', apiKey)
-      const resp = await fetch(url.toString(), { next: { revalidate: 0 } })
-      if (!resp.ok) throw new Error('fetch failed')
-      const data = await resp.json()
-      const leg = data?.routes?.[0]?.legs?.[0]
-      const overview = data?.routes?.[0]?.overview_polyline?.points
-      if (leg){
-        let decoded: { lat: number; lng: number }[] = []
-        if (overview){
-          decoded = decodePolyline(overview)
-        }
+      const route = await computeGoogleRoute(
+        origin,
+        destination,
+        ({ driving: 'DRIVE', walking: 'WALK', transit: 'TRANSIT', bicycling: 'BICYCLE' } as const)[travelMode]!,
+      )
+      if (route){
         results.push({
           mode: travelMode,
-            distanceMeters: leg.distance?.value,
-            durationSeconds: leg.duration?.value,
-            polyline: { path: decoded }
+          distanceMeters: route.distanceMeters,
+          durationSeconds: route.durationSeconds,
+          polyline: { path: route.path },
         })
       }
-    } catch (e){
-      // continue other modes
+    } catch (error) {
+      errors.push({
+        mode: travelMode,
+        error: error instanceof Error ? error.message : 'Google Routes API request failed',
+      })
     }
   }
 
-  return NextResponse.json({ routes: results })
-}
-
-// Polyline decoder (Google Encoded Polyline Algorithm Format)
-function decodePolyline(str: string){
-  let index = 0, lat = 0, lng = 0; const coordinates: { lat: number; lng: number }[] = []
-  while (index < str.length){
-    let b, shift = 0, result = 0
-    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
-    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1); lat += dlat
-    shift = 0; result = 0
-    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
-    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1); lng += dlng
-    coordinates.push({ lat: lat / 1e5, lng: lng / 1e5 })
-  }
-  return coordinates
+  return NextResponse.json(
+    { routes: results, ...(errors.length ? { errors } : {}) },
+    results.length || !errors.length ? undefined : { status: 502 },
+  )
 }

@@ -16,15 +16,19 @@ import type { Region } from "@/lib/regions"
 
 export function BookingPanel(){
   const radiusKm = 5
+  const hotelRadiusKm = 10
   const [monasteryId, setMonasteryId] = useState<string>(monasteries[0]?.id || "")
   const [dates, setDates] = useState<{in:string,out:string}>({ in: "", out: "" })
   const [guests, setGuests] = useState<number>(2)
   const query = useMemo(()=> new URLSearchParams({ monasteryId, checkIn: dates.in, checkOut: dates.out, guests: String(guests) }).toString(), [monasteryId, dates, guests])
   const m = useMemo(()=> monasteries.find(x=> x.id === monasteryId), [monasteryId])
   const [selected, setSelected] = useState<"hotel"|"tours"|"dining"|null>(null)
+  const [sortBy, setSortBy] = useState<"google"|"rating"|"price"|"distance">("google")
   const [nearby, setNearby] = useState<{ hotel:any[]; tours:any[]; dining:any[] }>({ hotel: [], tours: [], dining: [] })
   const [poi, setPoi] = useState<{ hotel:any[]; homestay:any[]; restaurant:any[]; attraction:any[] }>({ hotel: [], homestay: [], restaurant: [], attraction: [] })
   const [loading, setLoading] = useState(false)
+  const [placesHotels, setPlacesHotels] = useState<any[]>([])
+  const [placesTours, setPlacesTours] = useState<any[]>([])
   const [placesDining, setPlacesDining] = useState<Array<{ id:string; name:string; location:{lat:number;lng:number}; rating?:number; priceLevel?:number; phone?:string; vicinity?: string; address?: string }>>([])
   const [resolvedPlaces, setResolvedPlaces] = useState<Record<string, { placeId?: string; address?: string }>>({})
   const [hotelDialogOpen, setHotelDialogOpen] = useState(false)
@@ -136,6 +140,55 @@ export function BookingPanel(){
     return min + t * (max - min)
   }
 
+  function estimatePriceFromLevel(level?: string | number, fallback = 1200): number {
+    if (typeof level === "string") {
+      if (level === "PRICE_LEVEL_VERY_EXPENSIVE") return 3500
+      if (level === "PRICE_LEVEL_EXPENSIVE") return 2200
+      if (level === "PRICE_LEVEL_MODERATE") return 1400
+      if (level === "PRICE_LEVEL_INEXPENSIVE") return 900
+      return fallback
+    }
+    if (typeof level === "number") return [300, 500, 800, 1200, 1800][Math.max(0, Math.min(4, level))] || fallback
+    return fallback
+  }
+
+  function sortListings<T extends { rating?: number; priceINR?: number; distanceKm?: number }>(items: T[]): T[] {
+    if (sortBy === "google") return items
+    return [...items].sort((a, b) => {
+      if (sortBy === "rating") return (Number(b.rating) || 0) - (Number(a.rating) || 0) || (Number(a.distanceKm) || Infinity) - (Number(b.distanceKm) || Infinity)
+      if (sortBy === "price") return (Number(a.priceINR) || Infinity) - (Number(b.priceINR) || Infinity) || (Number(a.distanceKm) || Infinity) - (Number(b.distanceKm) || Infinity)
+      return (Number(a.distanceKm) || Infinity) - (Number(b.distanceKm) || Infinity) || (Number(b.rating) || 0) - (Number(a.rating) || 0)
+    })
+  }
+
+  async function verifyPayment(requestId: string, response: any): Promise<boolean> {
+    try {
+      const confirmation = await fetch('/api/services/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm_payment',
+          requestId,
+          payment: {
+            razorpay_payment_id: response?.razorpay_payment_id,
+            razorpay_order_id: response?.razorpay_order_id,
+            razorpay_signature: response?.razorpay_signature,
+          },
+        }),
+      })
+      const confirmationBody = await confirmation.json()
+      if (!confirmation.ok || !confirmationBody.confirmed) {
+        toast.error(confirmationBody.error || 'Payment verification failed')
+        return false
+      }
+      return true
+    } catch (error) {
+      console.error('Payment verification request failed', error)
+      toast.error('Payment verification failed')
+      return false
+    }
+  }
+
   useEffect(()=>{
     let cancelled = false
     async function load(){
@@ -167,6 +220,36 @@ export function BookingPanel(){
     return ()=>{ cancelled = true }
   },[m])
 
+  // Load real Google lodging and tourist-attraction listings for this monastery.
+  useEffect(()=>{
+    let cancelled = false
+    async function loadGoogleListings(){
+      if (!m) return
+      const near = `${m.coordinates.lat},${m.coordinates.lng}`
+      const radius = radiusKm * 1000
+      try {
+        const hotelResponse = await fetch(
+          `/api/services/places?near=${near}&radius=${hotelRadiusKm * 1000}&type=lodging&text=${encodeURIComponent(`hotels near ${m.name} ${m.location}`)}`,
+        )
+        const hotelResults = hotelResponse.ok ? (await hotelResponse.json()).results || [] : []
+        const tourResponse = await fetch(
+          `/api/services/places?near=${near}&radius=${radius}&type=tourist_attraction&text=${encodeURIComponent(`tourist attractions, sightseeing, activities near ${m.name} ${m.location}`)}`,
+        )
+        const tourResults = tourResponse.ok ? (await tourResponse.json()).results || [] : []
+        if (cancelled) return
+        setPlacesHotels(hotelResults)
+        setPlacesTours(tourResults)
+      } catch {
+        if (!cancelled) {
+          setPlacesHotels([])
+          setPlacesTours([])
+        }
+      }
+    }
+    loadGoogleListings()
+    return ()=>{ cancelled = true }
+  }, [m, radiusKm, hotelRadiusKm])
+
   // Reset resolvedPlaces when monastery changes
   useEffect(()=>{
     setResolvedPlaces({})
@@ -178,7 +261,7 @@ export function BookingPanel(){
     async function loadPlaces(){
       if (!m) return
       try {
-        const r = await fetch(`/api/services/places?near=${m.coordinates.lat},${m.coordinates.lng}&radius=${radiusKm*1000}&type=restaurant`)
+        const r = await fetch(`/api/services/places?near=${m.coordinates.lat},${m.coordinates.lng}&radius=${radiusKm*1000}&type=restaurant&text=${encodeURIComponent(`restaurants near ${m.name} ${m.location}`)}`)
         if (!r.ok) return
         const j = await r.json()
         if (!cancelled) setPlacesDining(j.results || [])
@@ -192,61 +275,46 @@ export function BookingPanel(){
 
   const accommodation = useMemo(()=>{
     if (!m) return [] as any[]
-    const combined = [...(poi.hotel||[]), ...(poi.homestay||[])]
-  const within = withinKm(m.coordinates, combined, radiusKm)
-    const sorted = sortByDistance(m.coordinates, within)
-    // normalize to a common shape and add derived distanceKm
-    return sorted.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      distanceKm: Number(haversineKm(m.coordinates, p.coordinates).toFixed(2)),
-      coordinates: p.coordinates,
-      tags: p.tags || {},
-    }))
-  }, [poi, m])
+    const googleItems = placesHotels
+      .filter((item: any) => item?.location && item?.name)
+      .map((item: any) => ({
+        ...item,
+        id: `google-hotel-${item.id}`,
+        placeId: item.id,
+        distanceKm: Number(haversineKm(m.coordinates, item.location).toFixed(2)),
+        coordinates: item.location,
+        priceINR: item.priceLevel === "PRICE_LEVEL_VERY_EXPENSIVE"
+          ? 6000
+          : item.priceLevel === "PRICE_LEVEL_EXPENSIVE"
+            ? 3500
+            : item.priceLevel === "PRICE_LEVEL_MODERATE"
+              ? 2200
+              : 1200,
+        tags: { tourism: "hotel", source: "Google Maps" },
+        address: item.address || item.vicinity,
+        phone: item.phone || "",
+        website: item.website || "",
+        userRatingsTotal: item.userRatingsTotal || 0,
+        openingHours: item.openingHours || [],
+        source: "Google Places",
+      }))
+      .filter((item: any) => item.distanceKm <= hotelRadiusKm)
+    return googleItems
+  }, [placesHotels, m, hotelRadiusKm])
 
   const enrichedAccommodation = useMemo(()=>{
     return accommodation.map((p: any) => {
-      // find closest mock hotel for price/rating if available
-      const nearest = (nearby.hotel||[]).reduce<{item:any|null,dist:number}>((acc, b:any) => {
-        const d = haversineKm(p.coordinates, b.location)
-        if (d < acc.dist) return { item: b, dist: d }
-        return acc
-      }, { item: null, dist: Infinity }).item
-  const nameL = String(p.name || '').toLowerCase()
-  const isHomestayByTag = p.tags?.amenity === 'homestay' || p.tags?.tourism === 'guest_house'
-  const isHomestayByName = nameL.includes('homestay') || nameL.includes('home stay') || nameL.includes('home-stay')
-  const isHomestay = isHomestayByTag || isHomestayByName
-  const isHotel = !isHomestay && (p.tags?.tourism && ["hotel","hostel","motel"].includes(p.tags.tourism))
-      const est = isHotel ? 3500 : 1500
-      const priceINR = nearest?.priceINR ?? est
-      const rating = nearest?.rating ?? (p.tags?.stars ? Math.min(5, 3 + Number(p.tags.stars) * 0.4) : 4.3)
-  const phone = p.tags?.phone || p.tags?.["contact:phone"] || ""
-  // Build address from OSM tags (fallback only; may be enhanced via Places lookups later)
-  const streetNum = p.tags?.['addr:housenumber']
-  const street = p.tags?.['addr:street'] || p.tags?.['addr:road']
-  const area = p.tags?.['addr:place'] || p.tags?.['addr:suburb'] || p.tags?.['addr:neighbourhood']
-  const city = p.tags?.['addr:city']
-  const parts = [] as string[]
-  if (streetNum && street) parts.push(`${streetNum} ${street}`)
-  else if (street) parts.push(street)
-  if (area) parts.push(area)
-  if (city) parts.push(city)
-  const addrOSM = (p.tags?.['addr:full'] as string) || parts.join(', ')
-      const amenities: string[] = []
-      if (p.tags?.internet_access || p.tags?.wifi === "yes") amenities.push("WiFi")
-      if (p.tags?.restaurant === "yes" || p.tags?.cuisine) amenities.push("Restaurant")
-      if (p.tags?.spa === "yes") amenities.push("Spa")
-      if (p.tags?.view || p.tags?.["view:mountain"]) amenities.push("Mountain View")
-      // keep amenities strictly functional; kind will be shown as a separate chip
-  const locality = p.tags?.['addr:city'] || p.tags?.['addr:place'] || p.tags?.['addr:suburb'] || p.tags?.['addr:town'] || ""
-  const address = addrOSM
-  const base = { ...p, priceINR, rating: Number(Number(rating).toFixed(1)), phone, amenities, locality, address }
-  const pool = isHomestay ? HOMESTAY_LINES : HOTEL_LINES
-  const desc = stablePick(pool, `${p.id}-${m?.id || ''}`)
-  return { ...base, desc, kind: isHomestay ? 'Homestay' : 'Hotel' }
+      const kind = p.primaryType
+        ? p.primaryType.replace(/_/g, " ")
+        : "Accommodation"
+      return {
+        ...p,
+        kind,
+        amenities: [],
+        locality: p.address || p.vicinity || "",
+      }
     })
-  }, [accommodation, nearby, m])
+  }, [accommodation])
 
   // Dining (restaurants) within radius
   const eateries = useMemo(()=>{
@@ -288,17 +356,20 @@ export function BookingPanel(){
   // Tours & Activities (from OSM attractions) within radius
   const attractions = useMemo(()=>{
     if (!m) return [] as any[]
-    const within = withinKm(m.coordinates, poi.attraction || [], radiusKm)
-    const sorted = sortByDistance(m.coordinates, within)
-    const named = sorted.filter((p:any)=> String(p?.name||'').trim().length > 0 && !/^unnamed$/i.test(p.name))
-    return named.map((p:any)=> ({
-      id: p.id,
-      name: p.name,
-      distanceKm: Number(haversineKm(m.coordinates, p.coordinates).toFixed(2)),
-      coordinates: p.coordinates,
-      tags: p.tags || {},
-    }))
-  }, [poi, m, radiusKm])
+    const googleItems = placesTours
+      .filter((item: any) => item?.location && item?.name)
+      .map((item: any) => ({
+        ...item,
+        id: `google-tour-${item.id}`,
+        placeId: item.id,
+        distanceKm: Number(haversineKm(m.coordinates, item.location).toFixed(2)),
+        coordinates: item.location,
+        tags: { tourism: "attraction", source: "Google Maps" },
+        address: item.address || item.vicinity,
+      }))
+      .filter((item: any) => item.distanceKm <= radiusKm)
+    return googleItems
+  }, [placesTours, m, radiusKm])
 
   const TOURS_LINES = [
     'Guided heritage walk with local stories.',
@@ -310,116 +381,34 @@ export function BookingPanel(){
 
   const enrichedTours = useMemo(()=>{
     return attractions.map((p:any)=>{
-      const nearest = (nearby.tours||[]).reduce<{item:any|null,dist:number}>((acc,b:any)=>{
-        const d = haversineKm(p.coordinates, b.location)
-        if (d < acc.dist) return { item: b, dist: d }
-        return acc
-      }, { item:null, dist: Infinity }).item
-      const basePrice = nearest?.priceINR ?? 1200
-      const jitter = stableJitter(`${p.id}-${m?.id || ''}`, 0.9, 1.25)
-      const priceINR = Math.max(250, Math.round(basePrice * jitter))
-      const rating = Number(((nearest?.rating ?? 4.5) + 0.01).toFixed(1))
-      const category = p.tags?.['attraction'] || p.tags?.['information'] || p.tags?.['heritage'] || 'Experience'
-      const desc = stablePick(TOURS_LINES, `${p.id}-${m?.id || ''}`)
-      return { ...p, priceINR, rating, category, desc }
+      return {
+        ...p,
+        priceINR: estimatePriceFromLevel(p.priceLevel, 900),
+        category: p.primaryType ? p.primaryType.replace(/_/g, " ") : "",
+        source: "Google Places",
+      }
     })
-  }, [attractions, nearby, m])
+  }, [attractions])
 
   const enrichedDining = useMemo(()=>{
-    function estimatePriceFromLevel(level?: number){
-      if (level === undefined || level === null) return 800
-      // Google price_level: 0 to 4 (0 free)
-      switch (Math.max(0, Math.min(4, level))) {
-        case 0: return 300
-        case 1: return 500
-        case 2: return 800
-        case 3: return 1200
-        case 4: return 1800
-        default: return 800
-      }
-    }
-    // 1) Base from OSM eateries (existing behavior)
-    const baseFromOSM = eateries.map((p:any)=>{
-      const nearest = (nearby.dining||[]).reduce<{item:any|null,dist:number}>((acc,b:any)=>{
-        const d = haversineKm(p.coordinates, b.location)
-        if (d < acc.dist) return { item: b, dist: d }
-        return acc
-      },{ item:null, dist: Infinity }).item
-      // Match Google Place closest to this OSM point (within ~1 km)
-      const gPlace = (placesDining||[]).filter(placeLooksInSikkim).reduce<{item:any|null,dist:number}>((acc, pl:any)=>{
-        const d = haversineKm(p.coordinates, pl.location)
-        if (d < acc.dist) return { item: pl, dist: d }
-        return acc
-      }, { item:null, dist: Infinity })
-  const placeMatch = gPlace.dist <= 2.5 ? gPlace.item : null
-  let priceINR = placeMatch ? estimatePriceFromLevel(placeMatch.priceLevel) : (nearest?.priceINR ?? 800)
-  // Apply stable jitter so prices aren't identical across items
-  const jitter = stableJitter(`${p.id}-${m?.id || ''}`)
-  priceINR = Math.max(150, Math.round(priceINR * jitter))
-      let rating = placeMatch?.rating ?? nearest?.rating ?? 4.3
-      let phone = placeMatch?.phone || p.tags?.phone || p.tags?.['contact:phone'] || ''
-      // Cuisine
-      let cuisine = ''
-      if (typeof p.tags?.cuisine === 'string') {
-        cuisine = String(p.tags.cuisine).split(';').map((s:string)=> s.trim()).slice(0,2).join(' & ')
-      }
-      const streetNum = p.tags?.['addr:housenumber']
-      const street = p.tags?.['addr:street'] || p.tags?.['addr:road']
-      const area = p.tags?.['addr:place'] || p.tags?.['addr:suburb'] || p.tags?.['addr:neighbourhood']
-      const city = p.tags?.['addr:city']
-      const parts = [] as string[]
-      if (streetNum && street) parts.push(`${streetNum} ${street}`)
-      else if (street) parts.push(street)
-      if (area) parts.push(area)
-      if (city) parts.push(city)
-      const addrFromPlaces = placeMatch?.address || placeMatch?.vicinity
-      const addrOSM = (p.tags?.['addr:full'] as string) || parts.join(', ')
-      const resolved = resolvedPlaces[p.id] || {}
-      const address = resolved.address || addrFromPlaces || addrOSM
-      const locality = city || area || street || ''
-      const desc = stablePick(DINING_LINES, `${p.id}-${m?.id || ''}`)
-      return { ...p, priceINR, rating: Number(Number(rating).toFixed(1)), phone, cuisine, locality, address, desc, placeId: placeMatch?.id || resolved.placeId }
-    })
-
-    // 2) Add all Google Places within radius that we haven't already covered by OSM
-    const placesWithin = (placesDining||[])
-      .filter(placeLooksInSikkim)
-      .map((pl:any)=> ({
-        id: `place:${pl.id}`,
-        name: pl.name,
-        coordinates: { lat: pl.location?.lat, lng: pl.location?.lng },
-        distanceKm: Number(haversineKm(m!.coordinates, { lat: pl.location?.lat, lng: pl.location?.lng }).toFixed(2)),
-        priceINR: Math.max(150, Math.round(estimatePriceFromLevel(pl.priceLevel) * stableJitter(`${pl.id}-${m?.id||''}`, 0.95, 1.15))),
-        rating: Number(Number(pl.rating ?? 4.3).toFixed(1)),
-        phone: pl.phone || '',
-        cuisine: '',
-        locality: '',
-        address: pl.address || pl.vicinity,
-        desc: stablePick(DINING_LINES, `${pl.id}-${m?.id || ''}`),
-        placeId: pl.id,
+    return placesDining
+      .filter((place: any) => place?.location && place?.name)
+      .map((place: any) => ({
+        ...place,
+        id: `google-dining-${place.id}`,
+        placeId: place.id,
+        coordinates: place.location,
+        distanceKm: Number(haversineKm(m!.coordinates, place.location).toFixed(2)),
+        priceINR: estimatePriceFromLevel(place.priceLevel, 800),
+        address: place.address || place.vicinity,
+        phone: place.phone || "",
+        rating: place.rating ? Number(Number(place.rating).toFixed(1)) : undefined,
+        userRatingsTotal: place.userRatingsTotal || 0,
+        desc: place.primaryType ? place.primaryType.replace(/_/g, " ") : "Google Places restaurant",
+        source: "Google Places",
       }))
-      .filter((it:any)=> it.distanceKm <= radiusKm)
-
-    // Dedupe: prefer those with placeId; drop if OSM-based already has same placeId or very similar name+address
-    const seenPlaceIds = new Set<string>(
-      baseFromOSM.map((x:any)=> x.placeId).filter(Boolean)
-    ) as Set<string>
-    const norm = (s?:string) => (s||'').toLowerCase().replace(/\s+/g,' ').trim()
-    const seenNameAddr = new Set<string>(
-      baseFromOSM.map((x:any)=> `${norm(x.name)}|${norm(x.address)}`)
-    )
-    const placesOnly = placesWithin.filter((it:any)=>{
-      if (it.placeId && seenPlaceIds.has(it.placeId)) return false
-      const key = `${norm(it.name)}|${norm(it.address)}`
-      if (seenNameAddr.has(key)) return false
-      return true
-    })
-
-    const combined = [...baseFromOSM, ...placesOnly]
-    // Sort by distance ascending
-    combined.sort((a:any,b:any)=> (a.distanceKm??Infinity) - (b.distanceKm??Infinity))
-    return combined
-  }, [eateries, nearby, placesDining, resolvedPlaces, m])
+      .filter((place: any) => place.distanceKm <= radiusKm)
+  }, [placesDining, m, radiusKm])
 
   // Background-resolve missing placeIds via Text Search so Map opens exact pages for all cards
   useEffect(()=>{
@@ -516,7 +505,7 @@ export function BookingPanel(){
         <CardHeader className="pb-0">
           <div className="-mx-6 -mt-6 rounded-t-[28px] bg-gradient-to-r from-amber-200 via-orange-300 to-amber-600 px-6 py-5">
             <CardTitle className="text-3xl font-extrabold tracking-tight text-primary">Booking & Reservations</CardTitle>
-            <p className="text-base mt-1 text-foreground">Select dates, guests and monastery to see nearby options (≤ 5 km).</p>
+            <p className="text-base mt-1 text-foreground">Select dates, guests and monastery to see nearby options (hotels ≤ 10 km).</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-2">
@@ -595,9 +584,23 @@ export function BookingPanel(){
               <div className="px-4 py-3 border-b border-amber-200/70 rounded-t-2xl bg-white/60">
                 <div className="flex items-center justify-between">
                   <div className="font-semibold text-primary">
-                    {selected === 'hotel' ? 'Hotels & Accommodation' : selected === 'tours' ? 'Tours & Activities' : 'Local Dining'} near {m?.name} (≤ {radiusKm} km)
+                    {selected === 'hotel' ? 'Hotels & Accommodation' : selected === 'tours' ? 'Tours & Activities' : 'Local Dining'} near {m?.name} (≤ {selected === 'hotel' ? hotelRadiusKm : radiusKm} km)
                   </div>
-                  {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
+                  <div className="flex items-center gap-3">
+                    <Label htmlFor="booking-sort" className="text-sm text-primary">Sort by</Label>
+                    <Select value={sortBy} onValueChange={(value)=> setSortBy(value as "google"|"rating"|"price"|"distance")}>
+                      <SelectTrigger id="booking-sort" className="h-9 w-[150px] rounded-xl border-amber-300 bg-white/90">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="google">Google ranking</SelectItem>
+                        <SelectItem value="distance">Distance</SelectItem>
+                        <SelectItem value="rating">Rating</SelectItem>
+                        <SelectItem value="price">Price</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
+                  </div>
                 </div>
               </div>
               <div className="p-4 grid gap-4">
@@ -606,8 +609,8 @@ export function BookingPanel(){
                     {loading ? (
                       <LoadingList label="Hotels & Accommodation" />
                     ) : enrichedAccommodation.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No hotels/homestays found within 5 km.</div>
-                    ) : enrichedAccommodation.map((x:any)=> (
+                      <div className="text-sm text-muted-foreground">No hotels or hostels found within {hotelRadiusKm} km.</div>
+                    ) : sortListings(enrichedAccommodation).map((x:any)=> (
                       <div key={x.id} className={`${styles.amberCard}`}>
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex items-start gap-4">
@@ -626,7 +629,26 @@ export function BookingPanel(){
                                   <span>Near {m?.name}</span>
                                 )}
                               </div>
-                              <div className="mt-2 text-amber-900/70">{x.desc}</div>
+                              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-amber-900/75">
+                                <span>{Number(x.distanceKm || 0).toFixed(2)} km from {m?.name}</span>
+                                <span className="inline-flex items-center gap-1"><Star className="w-4 h-4 text-amber-600" />{x.rating ? x.rating : "No rating"}</span>
+                              </div>
+                              {x.desc ? <div className="mt-2 text-amber-900/70">{x.desc}</div> : null}
+                              {x.userRatingsTotal ? (
+                                <div className="mt-1 text-sm text-amber-900/70">
+                                  {Number(x.userRatingsTotal).toLocaleString("en-IN")} Google reviews
+                                </div>
+                              ) : null}
+                              {x.website ? (
+                                <a
+                                  href={x.website}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-1 inline-block text-sm text-blue-700 underline"
+                                >
+                                  Official website
+                                </a>
+                              ) : null}
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <span className={styles.amberChip}>{x.kind || 'Hotel'}</span>
                                 {x.amenities?.slice(0,4).map((t:string, idx:number)=> (
@@ -640,12 +662,16 @@ export function BookingPanel(){
 
                           <div className="flex flex-col items-end gap-2 min-w-[180px]">
                             <div className="inline-flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 text-sm text-amber-800"><Star className="w-4 h-4" />{x.rating}</span>
-                              <span className="text-xs px-2 py-1 rounded-full bg-emerald-600/90 text-white">Available</span>
+                              {x.rating ? <span className="inline-flex items-center gap-1 text-sm text-amber-800"><Star className="w-4 h-4" />{x.rating}</span> : null}
+                              {x.businessStatus ? <span className="text-xs px-2 py-1 rounded-full bg-emerald-600/90 text-white">{String(x.businessStatus).replace("_", " ")}</span> : null}
                             </div>
-                            <div className="text-amber-900 text-xl font-extrabold">
-                              ₹{formatINR(x.priceINR)}<span className="pl-1 text-amber-800 text-sm font-medium">/night</span>
-                            </div>
+                            {x.priceINR ? (
+                              <div className="text-amber-900 text-xl font-extrabold">
+                                ₹{formatINR(x.priceINR)}<span className="pl-1 text-amber-800 text-sm font-medium">/night</span>
+                              </div>
+                            ) : x.priceLevel ? (
+                              <div className="text-amber-900 text-sm font-semibold">{String(x.priceLevel).replace("PRICE_LEVEL_", "Google price ")}</div>
+                            ) : null}
                             <div className="flex items-center gap-2 pt-1">
                               {x.phone && (
                                 <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={()=> window.open(`tel:${x.phone}`,'_self')}>
@@ -720,7 +746,7 @@ export function BookingPanel(){
                       <LoadingList label="Local Dining" />
                     ) : enrichedDining.length === 0 ? (
                       <div className="text-sm text-muted-foreground">No restaurants found within 5 km.</div>
-                    ) : enrichedDining.map((x:any)=> (
+                    ) : sortListings(enrichedDining).map((x:any)=> (
                       <div key={x.id} className={`${styles.amberCard}`}>
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex items-start gap-4">
@@ -733,6 +759,10 @@ export function BookingPanel(){
                                 <MapPin className="w-4 h-4" />
                                 {x.address ? (<span>{x.address}</span>) : (<span>Near {m?.name}</span>)}
                               </div>
+                              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-amber-900/75">
+                                <span>{Number(x.distanceKm || 0).toFixed(2)} km from {m?.name}</span>
+                                <span className="inline-flex items-center gap-1"><Star className="w-4 h-4 text-amber-600" />{x.rating ? x.rating : "No rating"}</span>
+                              </div>
                               <div className="mt-2 text-amber-900/70">{x.desc}</div>
                               {x.cuisine && (
                                 <div className="mt-2 text-amber-900/80 inline-flex items-center gap-2"><span className="text-amber-700">🍽️</span> Cuisine: {x.cuisine}</div>
@@ -744,8 +774,8 @@ export function BookingPanel(){
 
                           <div className="flex flex-col items-end gap-2 min-w-[180px]">
                             <div className="inline-flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 text-sm text-amber-800"><Star className="w-4 h-4" />{x.rating}</span>
-                              <span className="text-xs px-2 py-1 rounded-full bg-emerald-600/90 text-white">Available</span>
+                              {x.rating ? <span className="inline-flex items-center gap-1 text-sm text-amber-800"><Star className="w-4 h-4" />{x.rating}</span> : null}
+                              {x.businessStatus ? <span className="text-xs px-2 py-1 rounded-full bg-emerald-600/90 text-white">{String(x.businessStatus).replace("_", " ")}</span> : null}
                             </div>
                             <div className="text-amber-900 text-xl font-extrabold">
                               ₹{formatINR(x.priceINR)}<span className="pl-1 text-amber-800 text-sm font-medium">/person</span>
@@ -824,7 +854,7 @@ export function BookingPanel(){
                       <LoadingList label="Tours & Activities" />
                     ) : enrichedTours.length === 0 ? (
                       <div className="text-sm text-muted-foreground">No tours found within 5 km.</div>
-                    ) : enrichedTours.map((x:any)=> (
+                    ) : sortListings(enrichedTours).map((x:any)=> (
                       <div key={x.id} className={`${styles.amberCard}`}>
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex items-start gap-4">
@@ -839,10 +869,12 @@ export function BookingPanel(){
                                   <span className="opacity-90">• {Number(x.distanceKm).toFixed(2)} km from {m?.name}</span>
                                 )}
                               </div>
-                              <div className="mt-2 text-amber-900/70">{x.desc}</div>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <span className={styles.amberChip}>{x.category}</span>
-                              </div>
+                              {x.desc ? <div className="mt-2 text-amber-900/70">{x.desc}</div> : null}
+                              {x.category ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <span className={styles.amberChip}>{x.category}</span>
+                                </div>
+                              ) : null}
                             </div>
                           </div>
 
@@ -850,13 +882,23 @@ export function BookingPanel(){
 
                           <div className="flex flex-col items-end gap-2 min-w-[180px]">
                             <div className="inline-flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 text-sm text-amber-800"><Star className="w-4 h-4" />{x.rating}</span>
-                              <span className="text-xs px-2 py-1 rounded-full bg-emerald-600/90 text-white">Available</span>
+                              {x.rating ? <span className="inline-flex items-center gap-1 text-sm text-amber-800"><Star className="w-4 h-4" />{x.rating}</span> : null}
+                              {x.businessStatus ? <span className="text-xs px-2 py-1 rounded-full bg-emerald-600/90 text-white">{String(x.businessStatus).replace("_", " ")}</span> : null}
                             </div>
-                            <div className="text-amber-900 text-xl font-extrabold">
-                              ₹{formatINR(x.priceINR)}<span className="pl-1 text-amber-800 text-sm font-medium">/person</span>
-                            </div>
+                            {x.priceINR ? (
+                              <div className="text-amber-900 text-xl font-extrabold">
+                                ₹{formatINR(x.priceINR)}<span className="pl-1 text-amber-800 text-sm font-medium">/person</span>
+                              </div>
+                            ) : null}
                             <div className="flex items-center gap-2 pt-1">
+                              <Button className="rounded-full bg-amber-600 hover:bg-amber-700 text-white" onClick={()=>{
+                                const url = x.placeId
+                                  ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(x.placeId)}`
+                                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${x.name} ${x.address || m?.name || ""}`)}`
+                                window.open(url, '_blank', 'noopener,noreferrer')
+                              }}>
+                                <MapPin className="w-4 h-4 mr-2"/>Map
+                              </Button>
                               <Button className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600" onClick={()=>{ setSelectedTour(x); setToursDialogOpen(true) }}>
                                 <ExternalLink className="w-4 h-4 mr-2"/> Book Experience
                               </Button>
@@ -918,7 +960,7 @@ export function BookingPanel(){
               </div>
 
               {/* Bill */}
-              {(() => {
+              {selectedHotel.priceINR ? (() => {
                 const nights = calcNights(dates.in, dates.out)
                 const perNight = Number(selectedHotel.priceINR || 0)
                 const subtotal = perNight * nights
@@ -929,7 +971,7 @@ export function BookingPanel(){
                 const total = subtotal + gstAmt + addOn
                 return (
                   <div className="rounded-xl border p-4">
-                    <div className="text-primary font-semibold mb-2">Bill Summary</div>
+                    <div className="text-primary font-semibold mb-2">Hotel Rent Slip</div>
                     <div className="space-y-1 text-sm">
                       <div className="flex items-center justify-between"><span>Room charge</span><span>₹{formatINR(perNight)} / night</span></div>
                       <div className="flex items-center justify-between"><span>Nights</span><span>{nights}</span></div>
@@ -939,14 +981,19 @@ export function BookingPanel(){
                       <div className="h-px bg-border my-2" />
                       <div className="flex items-center justify-between text-lg font-extrabold"><span>Total</span><span>₹{formatINR(total)}</span></div>
                     </div>
-                    <div className="mt-2 text-xs text-muted-foreground">Pricing calculated by dates only; guest count not applied. Taxes are estimates; final invoice may vary.</div>
+                    <div className="mt-2 text-xs text-muted-foreground">Rent slip total includes the selected room estimate, nights, cancellation option, and applicable GST.</div>
                   </div>
                 )
-              })()}
+              })() : (
+                <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                  Google Places does not provide a verified room price for this property. Use the official website or Google Maps listing for current availability and pricing.
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
             <Button
+              disabled={!dates.in || !dates.out || calcNights(dates.in, dates.out) < 1}
               className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
               onClick={async()=>{
                 if (!selectedHotel) return
@@ -963,7 +1010,7 @@ export function BookingPanel(){
                 if (!r.ok) { toast.error(j.error || 'Failed'); return }
 
                 // If server returned a Razorpay order, open checkout
-                if (j?.order) {
+                if (j?.order && j?.key_id) {
                   try {
                     // load script if needed
                     if (typeof window !== 'undefined' && !(window as any).Razorpay) {
@@ -983,9 +1030,32 @@ export function BookingPanel(){
                       description: `Hotel booking for ${selectedHotel.name}`,
                       order_id: j.order.id,
                       handler: async (resp: any) => {
-                        toast.success('Payment successful')
-                        setHotelDialogOpen(false)
-                        setSelectedHotel(null)
+                        try {
+                          const confirmation = await fetch('/api/services/requests', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'confirm_payment',
+                              requestId: j.id,
+                              payment: {
+                                razorpay_payment_id: resp.razorpay_payment_id,
+                                razorpay_order_id: resp.razorpay_order_id,
+                                razorpay_signature: resp.razorpay_signature,
+                              },
+                            }),
+                          })
+                          const confirmationBody = await confirmation.json()
+                          if (!confirmation.ok || !confirmationBody.confirmed) {
+                            toast.error(confirmationBody.error || 'Payment verification failed')
+                            return
+                          }
+                          toast.success('Payment successful. Hotel booking confirmed.')
+                          setHotelDialogOpen(false)
+                          setSelectedHotel(null)
+                        } catch (error) {
+                          console.error('Hotel payment confirmation failed', error)
+                          toast.error('Payment completed, but booking confirmation failed')
+                        }
                       },
                       prefill: { contact: selectedHotel.phone || '' },
                       theme: { color: '#F97316' }
@@ -996,11 +1066,11 @@ export function BookingPanel(){
                   } catch (err:any) {
                     console.error('Razorpay checkout failed', err)
                     toast.error('Payment failed to start')
-                    // fallthrough to success message for request creation
+                    return
                   }
                 }
 
-                toast.success('Booking request submitted')
+                toast.error('Payment order was not created')
                 setHotelDialogOpen(false)
                 setSelectedHotel(null)
               }}
@@ -1079,7 +1149,7 @@ export function BookingPanel(){
                 const j = await r.json()
                 if (!r.ok) { toast.error(j.error || 'Failed'); return }
 
-                if (j?.order) {
+                if (j?.order && j?.key_id) {
                   try {
                     if (typeof window !== 'undefined' && !(window as any).Razorpay) {
                       await new Promise<void>((resolve, reject) => {
@@ -1098,7 +1168,9 @@ export function BookingPanel(){
                       description: `Dining reservation at ${selectedDining.name}`,
                       order_id: j.order.id,
                       handler: async (resp: any) => {
-                        toast.success('Payment successful')
+                        const confirmed = await verifyPayment(j.id, resp)
+                        if (!confirmed) return
+                        toast.success('Payment successful. Dining reservation confirmed.')
                         setDiningDialogOpen(false)
                         setSelectedDining(null)
                         setDiningReservation({ date:'', time:'' })
@@ -1112,13 +1184,11 @@ export function BookingPanel(){
                   } catch (err:any) {
                     console.error('Razorpay checkout failed', err)
                     toast.error('Payment failed to start')
+                    return
                   }
                 }
 
-                toast.success('Table request submitted')
-                setDiningDialogOpen(false)
-                setSelectedDining(null)
-                setDiningReservation({ date:'', time:'' })
+                toast.error('Payment order was not created')
               }}
             >
               <ExternalLink className="w-4 h-4 mr-2"/> Confirm Reservation
@@ -1151,7 +1221,7 @@ export function BookingPanel(){
                   <input type="time" className="mt-1 w-full h-10 rounded-md border px-3" value={tourReservation.time} onChange={(e)=> setTourReservation(p=>({ ...p, time: e.target.value }))} />
                 </div>
               </div>
-              {(() => {
+              {selectedTour.priceINR ? (() => {
                 const perPerson = Number(selectedTour.priceINR || 0)
                 const count = Math.max(1, Number(guests || 1))
                 const subtotal = perPerson * count
@@ -1173,7 +1243,11 @@ export function BookingPanel(){
                     <div className="mt-2 text-xs text-muted-foreground">Final confirmation depends on availability.</div>
                   </div>
                 )
-              })()}
+              })() : (
+                <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                  Google Places does not provide a verified activity price. Use the official website or Google Maps listing for current availability and pricing.
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -1193,7 +1267,7 @@ export function BookingPanel(){
                 const j = await r.json()
                 if (!r.ok) { toast.error(j.error||'Failed'); return }
 
-                if (j?.order) {
+                if (j?.order && j?.key_id) {
                   try {
                     if (typeof window !== 'undefined' && !(window as any).Razorpay) {
                       await new Promise<void>((resolve, reject) => {
@@ -1212,7 +1286,9 @@ export function BookingPanel(){
                       description: `Tour booking for ${selectedTour.name}`,
                       order_id: j.order.id,
                       handler: async (resp: any) => {
-                        toast.success('Payment successful')
+                        const confirmed = await verifyPayment(j.id, resp)
+                        if (!confirmed) return
+                        toast.success('Payment successful. Activity booking confirmed.')
                         setToursDialogOpen(false)
                         setSelectedTour(null)
                         setTourReservation({ date:'', time:'' })
@@ -1226,13 +1302,11 @@ export function BookingPanel(){
                   } catch (err:any) {
                     console.error('Razorpay checkout failed', err)
                     toast.error('Payment failed to start')
+                    return
                   }
                 }
 
-                toast.success('Request recorded')
-                setToursDialogOpen(false)
-                setSelectedTour(null)
-                setTourReservation({ date:'', time:'' })
+                toast.error('Payment order was not created')
               }}
             >
               <ExternalLink className="w-4 h-4 mr-2"/> Confirm Booking

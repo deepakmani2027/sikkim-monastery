@@ -6,13 +6,15 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_SK1f5eUajZ6FJa'
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'NkkooiFN8mpWirA34qzvqM48'
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET
 
-const razorpay = new (Razorpay as any)({
-	key_id: RAZORPAY_KEY_ID,
-	key_secret: RAZORPAY_KEY_SECRET,
-})
+const razorpay = RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET
+	? new (Razorpay as any)({
+		key_id: RAZORPAY_KEY_ID,
+		key_secret: RAZORPAY_KEY_SECRET,
+	})
+	: null
 
 const app = express()
 app.use(cors())
@@ -23,6 +25,9 @@ app.get('/health', (_req: Request, res: Response) => res.json({ ok: true }))
 // Create a Razorpay order. Expects { amount: number } where amount is in rupees.
 app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
 	try {
+		if (!razorpay || !RAZORPAY_KEY_ID) {
+			return res.status(503).json({ error: 'Razorpay is not configured' })
+		}
 		const { amount, currency = 'INR', receipt, notes } = req.body as any
 		if (typeof amount !== 'number') {
 			return res.status(400).json({ error: 'amount (number, in rupees) required' })

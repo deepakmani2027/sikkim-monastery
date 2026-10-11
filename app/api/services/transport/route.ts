@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { computeGoogleRoute } from "@/lib/google-maps"
 
 function toRad(n: number) { return (n * Math.PI) / 180 }
 function haversineKm(a: {lat:number,lng:number}, b: {lat:number,lng:number}){
@@ -16,21 +17,9 @@ const distanceCache: Record<string,{ km:number; ts:number }> = {}
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 async function googleDrivingDistanceKm(from: {lat:number,lng:number}, to: {lat:number,lng:number}): Promise<number | null> {
-	const key = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-	if (!key) return null
 	try {
-		const url = new URL('https://maps.googleapis.com/maps/api/directions/json')
-		url.searchParams.set('origin', `${from.lat},${from.lng}`)
-		url.searchParams.set('destination', `${to.lat},${to.lng}`)
-		url.searchParams.set('mode', 'driving')
-		url.searchParams.set('key', key)
-		const resp = await fetch(url.toString(), { cache: 'no-store' })
-		if (!resp.ok) return null
-		const data: any = await resp.json()
-		const leg = data?.routes?.[0]?.legs?.[0]
-		const meters = leg?.distance?.value
-		if (typeof meters === 'number' && meters > 0) return meters / 1000
-		return null
+		const route = await computeGoogleRoute(from, to, "DRIVE")
+		return route && route.distanceMeters > 0 ? route.distanceMeters / 1000 : null
 	} catch { return null }
 }
 
@@ -85,4 +74,3 @@ export async function GET(req: Request){
 		return NextResponse.json({ error: 'unexpected error' }, { status: 500 })
 	}
 }
-
