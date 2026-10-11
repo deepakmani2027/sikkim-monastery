@@ -87,6 +87,17 @@ async function searchPlaces(
   return Array.isArray(data.places) ? data.places.map(mapPlace) : []
 }
 
+function isGoogleAvailabilityError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  return (
+    message.includes("quota") ||
+    message.includes("resource_exhausted") ||
+    message.includes("permission") ||
+    message.includes("api key") ||
+    message.includes("billing")
+  )
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const near = parseLatLng(url.searchParams.get("near"))
@@ -131,7 +142,14 @@ export async function GET(req: Request) {
       },
       cache: "no-store",
     })
-    if (!response.ok) return NextResponse.json({ result: null }, { status: response.status })
+    if (!response.ok) {
+      const data = await response.json().catch(() => null)
+      const message = data?.error?.message || `Google Places returned ${response.status}`
+      if (response.status === 403 || response.status === 429 || isGoogleAvailabilityError(new Error(message))) {
+        return NextResponse.json({ result: null, degraded: true, error: message })
+      }
+      return NextResponse.json({ result: null, error: message }, { status: response.status })
+    }
     const place = mapPlace(await response.json())
     return NextResponse.json({ result: place })
   }
@@ -162,6 +180,13 @@ export async function GET(req: Request) {
       ),
     })
   } catch (error) {
+    if (isGoogleAvailabilityError(error)) {
+      return NextResponse.json({
+        results: [],
+        degraded: true,
+        error: error instanceof Error ? error.message : "Google Places is temporarily unavailable",
+      })
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Google Places request failed" },
       { status: 502 },
