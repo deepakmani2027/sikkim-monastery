@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter, usePathname } from "next/navigation"
-import { notFound } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
 import { getMonasteryById } from "@/lib/monasteries"
 import { Button } from "@/components/ui/button"
@@ -112,7 +111,13 @@ export default function DirectionsPage() {
     }
   }, [isAuthenticated, loading, router, pathname, params.id])
 
-  if (!monastery) return notFound()
+  if (!monastery) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Monastery not found.</p>
+      </div>
+    )
+  }
 
   useEffect(() => {
     const controller = new AbortController()

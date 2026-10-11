@@ -7,11 +7,12 @@ type Props = {
 	lat: number
 	lng: number
 	max?: number
+	fallbackImages?: string[]
 }
 
 type Photo = { name?: string; ref?: string; width: number; height: number; attributions?: string[] }
 
-export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
+export function GooglePhotosGrid({ name, lat, lng, max = 12, fallbackImages = [] }: Props) {
 	const [photos, setPhotos] = useState<Photo[] | null>(null)
 	const [placeId, setPlaceId] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
@@ -20,6 +21,9 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 	const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 
 	const photoUrl = (photo: Photo) =>
+		photo.ref?.startsWith("/")
+			? photo.ref
+			:
 		photo.name
 			? `/api/services/places?photoName=${encodeURIComponent(photo.name)}`
 			: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${Math.min(1600, Math.max(400, photo.width))}&photo_reference=${encodeURIComponent(
@@ -48,7 +52,7 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 					found = await fallbackRes.json()
 					cand = found.results?.[0]
 				}
-				if (!cand?.id) throw new Error("Place not found")
+				if (!cand?.id) throw new Error(found?.error || "Google Place not found")
 				if (!active) return
 				setPlaceId(cand.id)
 				// Fetch details including photos
@@ -60,7 +64,13 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 			} catch (e: any) {
 				if (!active) return
 				setError(e?.message || "Failed to load photos")
-				setPhotos([])
+				setPhotos(
+					fallbackImages.map((image) => ({
+						ref: image,
+						width: 1200,
+						height: 800,
+					})),
+				)
 			} finally {
 				if (active) setLoading(false)
 			}
@@ -69,7 +79,7 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 		return () => {
 			active = false
 		}
-	}, [name, lat, lng, max])
+	}, [name, lat, lng, max, fallbackImages])
 
 	const placeLink = useMemo(
 		() => (placeId ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(placeId)}` : null),
@@ -79,7 +89,11 @@ export function GooglePhotosGrid({ name, lat, lng, max = 12 }: Props) {
 	return (
 		<div className="space-y-2">
 			{loading && <div className="text-sm text-muted-foreground">Loading photos…</div>}
-			{error && <div className="text-sm text-amber-600">{error}</div>}
+			{error && (
+				<div className="text-sm text-amber-600">
+					{error}. Showing the monastery&apos;s verified local media instead.
+				</div>
+			)}
 			{photos && photos.length > 0 ? (
 				<div className="grid grid-cols-2 md:grid-cols-3 gap-2">
 					{photos.slice(0, limit).map((p) => (

@@ -65,7 +65,12 @@ export default function VirtualTourPage() {
 
         <section className="rounded-2xl border bg-card p-5 mb-6">
           <h2 className="text-xl font-semibold mb-3">Google media</h2>
-          <GooglePhotosGrid name={monastery.name} lat={monastery.coordinates.lat} lng={monastery.coordinates.lng} />
+          <GooglePhotosGrid
+            name={monastery.name}
+            lat={monastery.coordinates.lat}
+            lng={monastery.coordinates.lng}
+            fallbackImages={monastery.images}
+          />
         </section>
 
         {/* Site-curated panoramas, when verified scenes exist for this monastery */}

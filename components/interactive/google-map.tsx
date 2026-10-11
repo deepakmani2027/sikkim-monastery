@@ -30,6 +30,12 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
   mapsScriptPromise = new Promise((resolve, reject) => {
     const callbackName = `__googleMapsReady_${Date.now()}`
     const script = document.createElement('script')
+    const previousAuthFailure = (window as any).gm_authFailure
+    ;(window as any).gm_authFailure = () => {
+      mapsScriptPromise = null
+      reject(new Error("Google Maps JavaScript API authorization failed. Enable Maps JavaScript API and billing for this key."))
+      if (typeof previousAuthFailure === "function") previousAuthFailure()
+    }
     ;(window as any)[callbackName] = () => {
       delete (window as any)[callbackName]
       resolve()
@@ -37,7 +43,10 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly&loading=async&callback=${callbackName}`
     script.async = true
     script.defer = true
-    script.onerror = () => reject(new Error('Failed to load Google Maps'))
+    script.onerror = () => {
+      mapsScriptPromise = null
+      reject(new Error('Failed to load Google Maps'))
+    }
     document.head.appendChild(script)
   })
   return mapsScriptPromise
@@ -59,18 +68,33 @@ export interface GoogleMapProps {
   polyline?: { path: google.maps.LatLngLiteral[]; color?: string }
   fitBoundsToMarkers?: boolean
   onMapReady?: (map: google.maps.Map) => void
+  onError?: (error: Error) => void
 }
 
-export function GoogleMap({ center, zoom = 9, className = "h-full w-full", markers = [], polyline, fitBoundsToMarkers, onMapReady }: GoogleMapProps){
+export function GoogleMap({ center, zoom = 9, className = "h-full w-full", markers = [], polyline, fitBoundsToMarkers, onMapReady, onError }: GoogleMapProps){
   const ref = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(()=>{
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    if (!key){ console.warn('Missing NEXT_PUBLIC_GOOGLE_MAPS_API_KEY'); return }
+    if (!key){
+      const missing = new Error("Google Maps browser API key is missing.")
+      setError(missing.message)
+      onError?.(missing)
+      return
+    }
     let cancelled = false
-    loadGoogleMaps(key).then(()=>{
+    fetch("/api/google/status", { cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => null)
+        if (!response.ok || result?.enabled !== true) {
+          throw new Error(result?.error || "Google Maps API is not enabled for this project.")
+        }
+      })
+      .then(() => loadGoogleMaps(key))
+      .then(()=>{
       if (cancelled || !ref.current) return
       mapRef.current = new google.maps.Map(ref.current, {
         center,
@@ -81,7 +105,12 @@ export function GoogleMap({ center, zoom = 9, className = "h-full w-full", marke
       })
       setReady(true)
       if (onMapReady && mapRef.current) onMapReady(mapRef.current)
-    }).catch(e=> console.error(e))
+      })
+    .catch((e) => {
+      const failure = e instanceof Error ? e : new Error("Google Maps failed to load.")
+      setError(failure.message)
+      onError?.(failure)
+    })
     return ()=> { cancelled = true }
   }, [center.lat, center.lng, zoom])
 
@@ -142,6 +171,25 @@ export function GoogleMap({ center, zoom = 9, className = "h-full w-full", marke
       }
     }
   }, [polyline, ready])
+
+  if (error) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-muted/40 p-6 text-center`}>
+        <div className="max-w-md space-y-2 text-sm">
+          <p className="font-medium">Google Maps is unavailable for this API key.</p>
+          <p className="text-muted-foreground">{error}</p>
+          <a
+            className="inline-block underline text-primary"
+            href={`https://www.google.com/maps/@${center.lat},${center.lng},10z`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open this area in Google Maps
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return <div ref={ref} className={className} />
 }
