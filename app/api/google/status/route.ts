@@ -14,7 +14,16 @@ export async function GET() {
       "X-Goog-Api-Key": key,
       "X-Goog-FieldMask": "places.id",
     },
-    body: JSON.stringify({ textQuery: "Rumtek Monastery Sikkim", maxResultCount: 1 }),
+    body: JSON.stringify({
+      textQuery: "Rumtek Monastery Sikkim",
+      maxResultCount: 1,
+      locationBias: {
+        circle: {
+          center: { latitude: 27.3389, longitude: 88.5583 },
+          radius: 20000,
+        },
+      },
+    }),
     cache: "no-store",
   })
 
