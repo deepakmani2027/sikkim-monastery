@@ -57,12 +57,21 @@ export function GoogleStreetViewDynamic({
         script.src = src
         script.async = true
         script.defer = true
+        const previousAuthFailure = (window as any).gm_authFailure
+        ;(window as any).gm_authFailure = () => {
+          window.__googleMapsScriptPromise = undefined
+          reject(new Error("Google Maps JavaScript API authorization failed. Enable Maps JavaScript API and billing for this key."))
+          if (typeof previousAuthFailure === "function") previousAuthFailure()
+        }
         ;(window as any)[callbackName] = () => {
           delete (window as any)[callbackName]
           window.__googleMapsScriptLoaded = true
           resolve()
         }
-        script.onerror = () => reject(new Error("Failed to load Google Maps JS API"))
+        script.onerror = () => {
+          window.__googleMapsScriptPromise = undefined
+          reject(new Error("Failed to load Google Maps JS API"))
+        }
         document.head.appendChild(script)
       })
       return window.__googleMapsScriptPromise
@@ -102,6 +111,12 @@ export function GoogleStreetViewDynamic({
           setError("Missing NEXT_PUBLIC_GOOGLE_MAPS_API_KEY")
           setLoading(false)
           return
+        }
+
+        const healthResponse = await fetch("/api/google/status", { cache: "no-store" })
+        const health = await healthResponse.json().catch(() => null)
+        if (!healthResponse.ok || health?.enabled !== true) {
+          throw new Error(health?.error || "Google Maps API is not enabled for this project.")
         }
 
         await ensureScript()

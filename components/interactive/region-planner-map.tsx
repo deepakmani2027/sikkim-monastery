@@ -134,17 +134,20 @@ export function RegionPlannerMap() {
               `/api/services/places?near=${origin.lat},${origin.lng}&radius=${radiusKm * 1000}&type=${query.type}&text=${encodeURIComponent(query.text)}`,
               { cache: "no-store" },
             )
-            if (!response.ok) throw new Error(`Google Places request failed: ${response.status}`)
             const data = await response.json()
             return {
               category: query.category,
               results: Array.isArray(data.results) ? data.results : [],
+              degraded: data.degraded === true,
+              error: data.error,
             }
           }),
         )
         if (!active) return
         const next: PlannerPlace[] = []
+        let googleUnavailable = false
         responses.forEach(({ category, results }) => {
+          googleUnavailable = googleUnavailable || responses.some((response) => response.degraded)
           addUniquePlaces(
             next,
             results
@@ -161,7 +164,36 @@ export function RegionPlannerMap() {
               })),
           )
         })
+        if (googleUnavailable && next.length === 0) {
+          const fallbackResponse = await fetch(
+            `/api/services/nearby?near=${origin.lat},${origin.lng}&radiusKm=${radiusKm}`,
+            { cache: "no-store" },
+          )
+          const fallback = await fallbackResponse.json()
+          const fallbackGroups: Array<{ category: PlannerPlace["category"]; items?: any[] }> = [
+            { category: "hotel", items: fallback.hotel },
+            { category: "attraction", items: fallback.tours },
+            { category: "restaurant", items: fallback.dining },
+          ]
+          fallbackGroups.forEach(({ category, items }) => {
+            addUniquePlaces(
+              next,
+              (Array.isArray(items) ? items : []).map((place: any) => ({
+                id: `fallback-${category}-${place.id}`,
+                name: place.name,
+                category,
+                coordinates: place.location,
+                address: "Nearby fallback result",
+                rating: place.rating,
+                distanceKm: place.distanceKm,
+              })),
+            )
+          })
+        }
         setPlaces(next)
+        if (googleUnavailable) {
+          setError("Google Places quota is unavailable. Showing nearby fallback results.")
+        }
       } catch (loadError) {
         if (!active) return
         setPlaces([])
