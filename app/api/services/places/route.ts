@@ -19,6 +19,14 @@ type Place = {
   photos?: Array<{ name: string; width: number; height: number; attributions?: string[] }>
 }
 
+function explainGooglePlacesError(message: string) {
+  const normalized = message.toLowerCase()
+  if (normalized.includes("caller does not have permission") || normalized.includes("permission")) {
+    return "Google Places rejected the server key. Enable Places API (New) and billing in the key's Google Cloud project, then use that server key as GOOGLE_MAPS_SERVER_API_KEY."
+  }
+  return message
+}
+
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const toRad = (value: number) => (value * Math.PI) / 180
   const dLat = toRad(b.lat - a.lat)
@@ -80,7 +88,9 @@ async function searchPlaces(
   })
   if (!response.ok) {
     const data = await response.json().catch(() => null)
-    const message = data?.error?.message || `Google Places API returned ${response.status}`
+    const message = explainGooglePlacesError(
+      data?.error?.message || `Google Places API returned ${response.status}`,
+    )
     throw new Error(message)
   }
   const data = await response.json()
@@ -144,7 +154,9 @@ export async function GET(req: Request) {
     })
     if (!response.ok) {
       const data = await response.json().catch(() => null)
-      const message = data?.error?.message || `Google Places returned ${response.status}`
+      const message = explainGooglePlacesError(
+        data?.error?.message || `Google Places returned ${response.status}`,
+      )
       if (response.status === 403 || response.status === 429 || isGoogleAvailabilityError(new Error(message))) {
         return NextResponse.json({ result: null, degraded: true, error: message })
       }

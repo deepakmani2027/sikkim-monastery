@@ -192,7 +192,14 @@ export function RegionPlannerMap() {
         }
         setPlaces(next)
         if (googleUnavailable) {
-          setError("Google Places quota is unavailable. Showing nearby fallback results.")
+          const permissionError = responses.find((response) =>
+            String(response.error || "").toLowerCase().includes("permission"),
+          )
+          setError(
+            permissionError
+              ? "Google Places rejected the server key. Showing nearby fallback results. Enable Places API (New) and billing for that key."
+              : "Google Places quota is unavailable. Showing nearby fallback results.",
+          )
         }
       } catch (loadError) {
         if (!active) return
