@@ -159,9 +159,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    if (!isSupabaseEnabled() || !supabase) return
-    await supabase.auth.signOut()
     setAuthState({ user: null, isAuthenticated: false })
+    if (!isSupabaseEnabled() || !supabase) return
+
+    try {
+      const signOutRequest = supabase.auth.signOut()
+      await Promise.race([
+        signOutRequest,
+        new Promise((resolve) => setTimeout(resolve, 2500)),
+      ])
+    } catch (error) {
+      console.error("[auth] Failed to sign out cleanly", error)
+    } finally {
+      // Remove the persisted Supabase session even when the network request
+      // is unavailable, so the next page cannot restore the old user.
+      for (const key of Object.keys(window.localStorage)) {
+        if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+          window.localStorage.removeItem(key)
+        }
+      }
+    }
   }
 
   const resendConfirmationEmail = async (email: string) => {

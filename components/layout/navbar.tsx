@@ -5,12 +5,14 @@ import { useAuth } from "@/hooks/use-auth"
 import { LogOut, User, Menu } from "lucide-react"
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Logo } from "@/components/branding/Logo"
  
 
 export function Navbar() {
   const { user, logout } = useAuth()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const canSeeArchives = user?.role === "researcher" || user?.role === "admin"
   const canSee = user?.role === "tourist" 
@@ -38,6 +40,12 @@ export function Navbar() {
         return "bg-accent/10 text-accent"
       default:
         return "bg-muted text-muted-foreground"
+    }
+
+    const handleLogout = async () => {
+      await logout()
+      setIsMobileMenuOpen(false)
+      router.replace("/auth")
     }
   }
 
@@ -93,6 +101,17 @@ export function Navbar() {
                   <span className="hidden sm:inline">Account</span>
                 </Link>
               </Button>
+              {user && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center space-x-2 text-destructive hover:text-destructive"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign out</span>
+                </Button>
+              )}
           </div>
 
           {/* Mobile menu button */}
@@ -145,7 +164,7 @@ export function Navbar() {
                 </Button>
               </>
             )}
-            <Button variant="ghost" size="sm" onClick={logout} className="w-full justify-start text-destructive">
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
             </Button>
