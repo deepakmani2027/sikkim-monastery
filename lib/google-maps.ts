@@ -11,7 +11,8 @@ export function getGoogleMapsServerApiKey(): string | null {
   const key =
     process.env.GOOGLE_MAPS_SERVER_API_KEY ||
     process.env.GOOGLE_MAPS_API_KEY ||
-    process.env.GOOGLE_PLACES_API_KEY
+    process.env.GOOGLE_PLACES_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
   return key?.trim() || null
 }
 

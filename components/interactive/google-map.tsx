@@ -86,14 +86,7 @@ export function GoogleMap({ center, zoom = 9, className = "h-full w-full", marke
       return
     }
     let cancelled = false
-    fetch("/api/google/status", { cache: "no-store" })
-      .then(async (response) => {
-        const result = await response.json().catch(() => null)
-        if (!response.ok || result?.enabled !== true) {
-          throw new Error(result?.error || "Google Maps API is not enabled for this project.")
-        }
-      })
-      .then(() => loadGoogleMaps(key))
+    loadGoogleMaps(key)
       .then(()=>{
       if (cancelled || !ref.current) return
       mapRef.current = new google.maps.Map(ref.current, {

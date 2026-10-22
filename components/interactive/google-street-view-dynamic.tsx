@@ -113,12 +113,6 @@ export function GoogleStreetViewDynamic({
           return
         }
 
-        const healthResponse = await fetch("/api/google/status", { cache: "no-store" })
-        const health = await healthResponse.json().catch(() => null)
-        if (!healthResponse.ok || health?.enabled !== true) {
-          throw new Error(health?.error || "Google Maps API is not enabled for this project.")
-        }
-
         await ensureScript()
         if (cancelled) return
 

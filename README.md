@@ -47,3 +47,21 @@ SERPAPI_KEY=your_serpapi_key_here
    - q (query), cites, as_ylo, as_yhi, scisbd, cluster
 
 3. The UI provides year filters, recent-only toggle (scisbd), cited-by and PDF quick links.
+
+## Google Maps Platform setup
+
+The application uses Google Maps Platform in two environments:
+
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is used by the browser for Maps JavaScript and Street View.
+- `GOOGLE_MAPS_SERVER_API_KEY` is used by Next.js API routes for Places, Place Details, media, and Routes.
+
+For local development, copy `.env.example` to `.env.local` and add the keys. Keep `.env.local` private. In Vercel, add both variables for **Preview** and **Production**, then redeploy.
+
+Enable these APIs in the same Google Cloud project as the keys:
+
+- Maps JavaScript API
+- Places API (New)
+- Routes API
+- Geocoding API and Geolocation API if those features are used
+
+Enable billing and restrict the browser key to the deployed site origins. Restrict the server key by API and keep it out of client-side code. The `/api/google/status` endpoint only reports whether credentials are configured; Places and Routes endpoints return their own authorization or quota errors so a Places quota problem does not disable the map or Street View.
