@@ -41,12 +41,12 @@ export function Navbar() {
       default:
         return "bg-muted text-muted-foreground"
     }
+  }
 
-    const handleLogout = async () => {
-      await logout()
-      setIsMobileMenuOpen(false)
-      router.replace("/auth")
-    }
+  const handleLogout = async () => {
+    await logout()
+    setIsMobileMenuOpen(false)
+    router.replace("/auth")
   }
 
   return (
