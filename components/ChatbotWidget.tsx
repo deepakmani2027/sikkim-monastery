@@ -227,9 +227,9 @@ export default function ChatbotWidget() {
     }
 
     try {
-      // Create abort controller with 10 second timeout
+      // Allow time for the hosted LLM backend to generate a response.
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
@@ -244,7 +244,8 @@ export default function ChatbotWidget() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.detail || errorBody.error || `HTTP ${response.status}`);
       }
       
       const data = await response.json();
