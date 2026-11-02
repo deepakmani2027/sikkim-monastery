@@ -1,0 +1,7 @@
+[build]
+buildCommand = "corepack enable && pnpm install --frozen-lockfile && pnpm build"
+
+[deploy]
+startCommand = "corepack enable && pnpm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
