@@ -1,0 +1,51 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp.cjs
+/.pnp.loader.mjs
+
+# next.js
+/.next/
+/out/
+
+# coverage output
+coverage/
+
+# production
+/build
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+pnpm-debug.log*
+*.log
+
+# env files
+# Ignore all real env files, keep example tracked
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# editor & system junk
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# license files (kept locally, not pushed)
+/LICENSE*
+/license*
+/License*
+
+# chatbot folder - separate repository
+/chatbot/
