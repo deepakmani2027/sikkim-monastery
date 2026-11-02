@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 
 const ANAM_API_BASE = process.env.ANAM_API_BASE || "https://api.anam.ai"
-const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL
+const BACKEND_API_URL =
+  process.env.BACKEND_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "https://backend-sikkim-production.up.railway.app"
 const DEFAULT_PERSONA_ID = "7e20720d-abcd-49fa-b01d-3dc2feb707ee"
 
 function getErrorMessage(error: unknown) {
@@ -47,7 +50,7 @@ export async function POST() {
     return NextResponse.json(
       {
         error:
-          "Avatar service is not configured on the web service. Add ANAM_API_KEY and ANAM_AVATAR_ID to Railway, or configure NEXT_PUBLIC_BACKEND_URL to use the backend avatar service.",
+          "Avatar service is not configured. Configure ANAM_API_KEY and ANAM_PERSONA_ID on the web service, or ensure the backend avatar endpoint is deployed.",
       },
       { status: 500 },
     )
