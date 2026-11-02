@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 
 const ANAM_API_BASE = process.env.ANAM_API_BASE || "https://api.anam.ai"
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL
+const DEFAULT_PERSONA_ID = "7e20720d-abcd-49fa-b01d-3dc2feb707ee"
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unexpected avatar session error"
@@ -16,10 +18,36 @@ export async function POST() {
   const llmId = process.env.ANAM_LLM_ID
 
   if (!anamApiKey || !personaId) {
+    if (BACKEND_API_URL) {
+      try {
+        const backendResponse = await fetch(`${BACKEND_API_URL}/api/anam/session-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        })
+        const backendData = (await backendResponse.json().catch(() => ({}))) as {
+          sessionToken?: string
+          detail?: string
+          error?: string
+        }
+
+        if (backendResponse.ok && backendData.sessionToken) {
+          return NextResponse.json({
+            sessionToken: backendData.sessionToken,
+            personaConfig: { personaId: personaId || DEFAULT_PERSONA_ID },
+          })
+        }
+
+        console.error("[anam] Backend fallback failed:", backendData.error || backendData.detail)
+      } catch (error) {
+        console.error("[anam] Backend fallback request failed:", error)
+      }
+    }
+
     return NextResponse.json(
       {
         error:
-          "Avatar service is not configured. Set ANAM_API_KEY and ANAM_PERSONA_ID (or ANAM_AVATAR_ID) on the server.",
+          "Avatar service is not configured on the web service. Add ANAM_API_KEY and ANAM_AVATAR_ID to Railway, or configure NEXT_PUBLIC_BACKEND_URL to use the backend avatar service.",
       },
       { status: 500 },
     )
