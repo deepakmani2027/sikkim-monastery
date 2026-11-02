@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Mic, MicOff, X, Send, Volume2, VolumeX } from 'lucide-react';
 import AvatarMode from './AvatarMode';
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const MONK_AVATAR = "https://static.prod-images.emergentagent.com/jobs/555f74e7-3ced-43c1-b248-5241d6ead246/images/a0c4d98db915762b6db9b6c2eca4343838f1e0962a9e7eaf5038f6486af91618.png";
 
 type SpeechRecognitionLike = {
@@ -213,25 +212,12 @@ export default function ChatbotWidget() {
 
     setTimeout(() => inputRef.current?.focus(), 100);
 
-    if (!API_URL) {
-      console.warn('API_URL not configured - using mock response');
-      setTimeout(() => {
-        const mockReply = `The winds echo your words: "${trimmed}". But the sacred connection to the backend is missing. Please set NEXT_PUBLIC_BACKEND_URL.`;
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: stripGreeting(mockReply)
-        }]);
-        setLoading(false);
-      }, 800);
-      return;
-    }
-
     try {
       // Allow time for the hosted LLM backend to generate a response.
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch(`${API_URL}/api/chat`, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -275,7 +261,7 @@ export default function ChatbotWidget() {
     } finally {
       setLoading(false);
     }
-  }, [loading, speakMode, playAudio, speakWithElevenLabs, API_URL]);
+  }, [loading, speakMode, playAudio, speakWithElevenLabs]);
 
   const toggleSpeechToText = () => {
     const recognition = recognitionRef.current;
