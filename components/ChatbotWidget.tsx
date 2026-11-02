@@ -164,19 +164,33 @@ export default function ChatbotWidget() {
   }, []);
 
   const speakWithElevenLabs = useCallback(async (text: string) => {
-    const response = await fetch('/api/elevenlabs/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
+    try {
+      const response = await fetch('/api/elevenlabs/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
 
-    if (!response.ok) {
+      if (response.ok) {
+        const audioUrl = URL.createObjectURL(await response.blob());
+        playAudio(audioUrl);
+        return;
+      }
+
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || `ElevenLabs TTS failed with HTTP ${response.status}`);
+      console.warn('ElevenLabs speech unavailable:', data.error || response.status);
+    } catch (error) {
+      console.warn('ElevenLabs speech request failed:', error);
     }
 
-    const audioUrl = URL.createObjectURL(await response.blob());
-    playAudio(audioUrl);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onstart = () => setIsPlaying(true);
+      utterance.onend = () => setIsPlaying(false);
+      utterance.onerror = () => setIsPlaying(false);
+      window.speechSynthesis.speak(utterance);
+    }
   }, [playAudio]);
 
   const stripGreeting = (text: string): string => {
