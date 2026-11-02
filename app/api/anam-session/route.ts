@@ -29,8 +29,8 @@ export async function POST() {
     const personaConfig: Record<string, unknown> = {}
     let environment: Record<string, unknown> | undefined
 
-    if (elevenLabsApiKey || agentId) {
-      if (!elevenLabsApiKey || !agentId) {
+    if (agentId) {
+      if (!elevenLabsApiKey) {
         return NextResponse.json(
           { error: "ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID must be configured together" },
           { status: 500 },

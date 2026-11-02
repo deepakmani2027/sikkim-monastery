@@ -61,11 +61,11 @@ ANAM_PERSONA_ID=...
 ANAM_LLM_ID=...
 ANAM_VOICE_ID=...
 ELEVENLABS_API_KEY=...
-ELEVENLABS_AGENT_ID=...
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
 ```
 
-The avatar requests a fresh session from `POST /api/anam-session`. If the
-ElevenLabs variables are configured, the route fetches a short-lived signed URL
-and mints an Anam token with the nested
-`environment.elevenLabsAgentSettings` configuration. Otherwise it uses the
-existing Anam Lab persona configured by `ANAM_PERSONA_ID`.
+When `ELEVENLABS_API_KEY` is configured, chat voice mode uses the server route
+`POST /api/elevenlabs/tts` and the `eleven_v3` model. Keep the key server-only.
+The avatar uses the existing Anam Lab persona configured by `ANAM_PERSONA_ID`
+(or `ANAM_AVATAR_ID`). An ElevenLabs agent integration additionally requires
+`ELEVENLABS_AGENT_ID`; a regular ElevenLabs TTS key does not.

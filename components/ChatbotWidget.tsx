@@ -163,6 +163,22 @@ export default function ChatbotWidget() {
     };
   }, []);
 
+  const speakWithElevenLabs = useCallback(async (text: string) => {
+    const response = await fetch('/api/elevenlabs/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `ElevenLabs TTS failed with HTTP ${response.status}`);
+    }
+
+    const audioUrl = URL.createObjectURL(await response.blob());
+    playAudio(audioUrl);
+  }, [playAudio]);
+
   const stripGreeting = (text: string): string => {
     const greeting = 'Welcome, traveler... to the sacred monasteries of Sikkim. I am Tenzin... your guide. ';
     if (text.startsWith(greeting)) {
@@ -223,8 +239,12 @@ export default function ChatbotWidget() {
       
       setMessages(prev => [...prev, { role: 'assistant', content: cleanedReply }]);
 
-      if (data.audio_url && speakMode) {
-        playAudio(data.audio_url);
+      if (speakMode) {
+        if (data.audio_url) {
+          playAudio(data.audio_url);
+        } else {
+          await speakWithElevenLabs(cleanedReply);
+        }
       }
     } catch (err: any) {
       console.error('API error:', err);
@@ -240,7 +260,7 @@ export default function ChatbotWidget() {
     } finally {
       setLoading(false);
     }
-  }, [loading, speakMode, playAudio, API_URL]);
+  }, [loading, speakMode, playAudio, speakWithElevenLabs, API_URL]);
 
   const toggleSpeechToText = () => {
     const recognition = recognitionRef.current;
